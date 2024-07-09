@@ -8,3 +8,6 @@ mlflow
 torch
 torchvision
 torchaudio
+
+segmentation-models-pytorch
+albumentations 

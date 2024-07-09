@@ -14,8 +14,8 @@ class ScannerData:
     image_paths: list = field(default_factory=list)
     mask_paths: list = field(default_factory=list)
 
-    image: List[str] = field(default_factory=list)
-    mask: List[str] = field(default_factory=list)
+    images: List[str] = field(default_factory=list)
+    masks: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         image_dir = os.path.join(self.data_dir, "image")
@@ -24,14 +24,17 @@ class ScannerData:
         self.image_paths.extend(glob.glob(os.path.join(image_dir, "*.png")))
         self.mask_paths.extend(glob.glob(os.path.join(mask_dir, "*.png")))
 
+        self.image_paths = sorted(self.image_paths)
+        self.mask_paths = sorted(self.mask_paths)
+
         return
 
     def load(self):
         for image_path in sorted(self.image_paths):
-            self.image.append(np.array(Image.open(image_path)))
+            self.images.append(np.array(Image.open(image_path)))
 
         for mask_path in sorted(self.mask_paths):
-            self.mask.append(np.array(Image.open(mask_path)))
+            self.masks.append(np.array(Image.open(mask_path)))
 
         return self
 
@@ -44,6 +47,13 @@ class ScannerData:
 
     def __len__(self) -> int:
         return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        if isinstance(idx, int):
+            return self.image[idx], self.mask[idx]
+
+        if isinstance(idx, slice):
+            return [(self.image[i], self.mask[i]) for i in idx]
 
 
 class Scanncers(Enum):
@@ -90,6 +100,6 @@ class COSASData:
         images = list()
         for scanner in Scanncers:
             scanner_data: ScannerData = getattr(self, scanner.name)
-            images.extend(scanner_data.image)
+            images.extend(scanner_data.images)
 
         return images
