@@ -1,26 +1,25 @@
-# Reinhard
 import os
-import random
 
 import mlflow
 import segmentation_models_pytorch as smp
-from sklearn.model_selection import train_test_split
-from torchvision.transforms import Compose, Resize, ToTensor, ToPILImage
+import torch
+import albumentations as A
+from torch.utils.data import DataLoader
+from albumentations.pytorch.transforms import ToTensorV2
 
 
 from cosas.tracking import get_experiment
-
 from cosas.paths import DATA_DIR
-from cosas.data_model import COSASData, Scanncers
+from cosas.data_model import COSASData
 from cosas.datasets import COSASdataset
 from cosas.misc import set_seed, train_val_split
-
+from cosas.trainer import BinaryClassifierTrainer
+from cosas.tracking import TRACKING_URI, get_experiment
 
 if __name__ == "__main__":
 
     DEVICE = "cuda"
-    experiment = get_experiment()
-    set_seed(42)  # TODO
+    set_seed(42)
 
     cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
     cosas_data.load()
@@ -36,12 +35,58 @@ if __name__ == "__main__":
         activation=None,
     ).to(DEVICE)
 
-    transform = Compose(
+    train_transform = A.Compose(
         [
-            ToPILImage(),
-            Resize((256, 256)),
-            ToTensor(),
+            A.RandomCrop(height=224, width=224, p=1),
+            A.Resize(224, 224),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            # TODO: RandomRotation90 추가
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2(),
+        ]
+    )
+    test_transform = A.Compose(
+        [
+            A.Resize(224, 224),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2(),
         ]
     )
 
-    breakpoint()
+    train_dataset = COSASdataset(train_images, train_masks, train_transform)
+    train_dataloader = DataLoader(train_dataset, batch_size=4)
+    val_dataloader = DataLoader(
+        COSASdataset(val_images, val_masks, test_transform), batch_size=4
+    )
+
+    n_steps = len(train_dataloader)
+    trainer = BinaryClassifierTrainer(
+        model,
+        torch.nn.functional.binary_cross_entropy_with_logits,
+        optimizer=torch.optim.Adam(model.parameters(), lr=0.001),
+    )
+
+    mlflow.set_tracking_uri(TRACKING_URI)
+    experiment = get_experiment("cosas")
+    with mlflow.start_run(
+        experiment_id=experiment.experiment_id, run_name="test_run"
+    ) as run:
+        trainer.train(
+            train_dataloader,
+            val_dataloader,
+            10,
+            7,
+        )
+        mlflow.pytorch.log_model(trainer.model, "model")
+
+        test_dataloader = DataLoader(
+            COSASdataset(test_images, test_masks, test_transform),
+            batch_size=4,
+            shuffle=False,
+        )
+        test_loss, test_metrics = trainer.run_epoch(
+            "test", epoch=15, dataloader=test_dataloader
+        )
+        mlflow.log_metric("test_loss", test_loss.avg)
+        mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
