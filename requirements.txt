@@ -1,8 +1,9 @@
 matplotlib
+mlflow
 pillow
 scikit-image==0.24.0
 seaborn
-mlflow
+progress
 
 --extra-index-url https://download.pytorch.org/whl/cu121
 torch
