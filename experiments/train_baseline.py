@@ -88,7 +88,7 @@ if __name__ == "__main__":
         )
         mlflow.pytorch.log_model(trainer.model, "model")
 
-        test_dataloader = DataLoader(
+        test_dataloader = Patchdataset(
             COSASdataset(test_images, test_masks, test_transform),
             batch_size=args.batch_size,
             shuffle=False,
