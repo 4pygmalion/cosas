@@ -1,4 +1,6 @@
+import argparse
 from typing import Tuple
+
 
 import random
 import numpy as np
@@ -7,6 +9,20 @@ import torch
 from sklearn.model_selection import train_test_split
 
 from .data_model import COSASData, Scanncers
+
+
+def get_config() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--num_workers", type=int, default=1)
+    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--lr", type=float, default=0.0001)
+    parser.add_argument("--run_name", type=str, default="baseline")
+    parser.add_argument("--n_patience", type=int, default=7)
+
+    return parser.parse_args()
 
 
 def set_seed(seed: int) -> None:
