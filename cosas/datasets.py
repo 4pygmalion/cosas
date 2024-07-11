@@ -65,32 +65,41 @@ class WholeSizeDataset(Dataset):
     def _tesellation(
         self, image_tensor: torch.Tensor, size: tuple = (224, 224)
     ) -> torch.Tensor:
-        """약 1400x1400의 이미지를 패딩하여 224의 정수배로 만들어, grid로
-        non overlapping 패치를 만듬
+        """size의 정수배인 image_tensor을 입력받아, 패치단위로 타일링을 진행
+
+        Note:
+            아래와 동일한 코드
+            >>> patches = []
+            >>> for i in range(0, W, patch_w):
+            >>>     for j in range(0, H, patch_h):
+            >>>         patch = padded_tensor[:, i : i + patch_w, j : j + patch_h]
+            >>>         patches.append(patch)
+            >>> # 패치들을 텐서로 변환
+            >>> patches = torch.stack(patches)
 
         Returns
             pathces (torch.Tensor): shape (n_patches, c, patch_h, patch_w)
+
         """
 
+        C, W, H = image_tensor.shape
         patch_w, patch_h = size
 
+        # (C, W, H)
         padded_tensor: torch.Tensor = self._pad(image_tensor)
 
-        return (
-            padded_tensor.unfold(1, patch_h, patch_h)
-            .unfold(2, patch_w, patch_w)  # (C, row, col, w, h)
-            .permute((0, 3, 4, 1, 2))  # (C, w, h, row, col)
-            .flatten(3)  # (C, w, h, N)
-            .permute((3, 0, 1, 2))  # (N, C, W, H)
-        )
+        # (C, row, W, h) -> (C, row, w, col, h, w)
+        patches = padded_tensor.unfold(1, patch_h, patch_h).unfold(2, patch_w, patch_w)
+
+        return patches.permute(1, 2, 0, 3, 4).contiguous().view(-1, C, patch_h, patch_w)
 
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
         image = self.images[idx]
         mask = self.masks[idx]
 
         if self.transform:
-            augmented = self.transform(image=image, mask=mask)
-            image, mask = (augmented["image"], augmented["mask"])  # (Tensor, Tensor)
+            augmented = self.transform(image=image)
+            image, mask = augmented["image"], augmented["mask"]  # (Tensor, Tensor)
 
         else:
             image = torch.from_numpy(image).float()
