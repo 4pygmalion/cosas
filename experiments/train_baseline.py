@@ -29,7 +29,7 @@ if __name__ == "__main__":
     )
 
     model = smp.FPN(
-        encoder_name="efficientnet-b0",
+        encoder_name="resnet34",
         encoder_weights="imagenet",
         classes=1,
         activation=None,
@@ -74,6 +74,7 @@ if __name__ == "__main__":
         experiment_id=experiment.experiment_id, run_name=args.run_name
     ):
         mlflow.log_params(args.__dict__)
+        mlflow.log_artifact(os.path.abspath(__file__))
         trainer.train(
             train_dataloader,
             val_dataset,
@@ -87,6 +88,8 @@ if __name__ == "__main__":
             test_masks,
             test_transform,
         )
-        test_loss, test_metrics = trainer.test(test_dataset, "test", threshold=0.5)
+        test_loss, test_metrics = trainer.test(
+            test_dataset, phase="test", threshold=0.5
+        )
         mlflow.log_metric("test_loss", test_loss.avg)
         mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
