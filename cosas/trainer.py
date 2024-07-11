@@ -13,6 +13,7 @@ from progress.bar import Bar
 from sklearn.metrics import roc_auc_score
 
 from .metrics import Metrics, AverageMeter, calculate_metrics
+from .datasets import WholeSizeDataset
 
 
 class BaseTrainer(ABC):
@@ -86,9 +87,8 @@ class BinaryClassifierTrainer(ABC):
             f"{metric_sentence}"
         )
 
-    def run_epoch(
+    def run_train_epoch(
         self,
-        phase: str,
         epoch: int,
         dataloader: torch.utils.data.DataLoader,
         threshold: float = 0.5,
@@ -116,21 +116,15 @@ class BinaryClassifierTrainer(ABC):
         for step, batch in enumerate(dataloader):
             xs, ys = batch
 
-            if phase == "train":
-                self.model.train()
-                logits = self.model(xs)
-            else:
-                self.model.eval()
-                with torch.no_grad():
-                    logits = self.model(xs)
+            self.model.train()
+            logits = self.model(xs)
 
             logits = logits.view(ys.shape)
             loss = self.loss(logits, ys.float())
 
-            if phase == "train":
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
 
             # metric
             loss_meter.update(loss.item(), len(ys))
@@ -146,7 +140,7 @@ class BinaryClassifierTrainer(ABC):
             )
 
             bar.suffix = self.make_bar_sentence(
-                phase=phase,
+                phase="train",
                 epoch=epoch,
                 step=step,
                 total_step=total_step,
@@ -160,25 +154,64 @@ class BinaryClassifierTrainer(ABC):
 
         return (loss_meter, metrics_meter)
 
+    @torch.no_grad()
+    def test(self, test_dataset: WholeSizeDataset, phase: str, threshold=0.5):
+        self.model.eval()
+
+        n_data = len(test_dataset)
+        loss_meter = AverageMeter("loss")
+        metrics_meter = Metrics()
+        bar = Bar(max=n_data, check_tty=False)
+        for step, (x, y) in enumerate(test_dataset):
+            logits = self.model(x)  # (B, C, W, H)
+            logits = logits.view(y.shape)
+            loss = self.loss(logits, y.float())
+
+            # metric
+            loss_meter.update(loss.item())
+
+            confidences = torch.sigmoid(logits).flatten()
+            flatten_ys = y.flatten()
+            metrics_meter.update(
+                calculate_metrics(
+                    confidences.detach().cpu().numpy(),
+                    flatten_ys.detach().cpu().numpy(),
+                    threshold=threshold,
+                )
+            )
+
+            bar.suffix = self.make_bar_sentence(
+                phase=phase,
+                epoch=0,
+                step=step,
+                total_step=n_data,
+                eta=bar.eta,
+                total_loss=loss_meter.avg,
+                metrics=metrics_meter,
+            )
+            bar.next()
+
+        bar.finish()
+
+        return (loss_meter, metrics_meter)
+
     def train(
         self,
         train_dataloader: DataLoader,
-        val_dataloader: DataLoader,
+        val_dataset: WholeSizeDataset,
         epochs: int,
         n_patience: int,
     ):
 
         best_loss = math.inf
         for epoch in range(epochs):
-            train_loss, train_metrics = self.run_epoch(
-                phase="train", epoch=epoch, dataloader=train_dataloader
+            train_loss, train_metrics = self.run_train_epoch(
+                epoch=epoch, dataloader=train_dataloader
             )
             mlflow.log_metric("train_loss", train_loss.avg, step=epoch)
             mlflow.log_metrics(train_metrics.to_dict(prefix="train_"), step=epoch)
 
-            val_loss, val_metrics = self.run_epoch(
-                phase="validation", epoch=epoch, dataloader=val_dataloader
-            )
+            val_loss, val_metrics = self.test(val_dataset, phase="val")
             mlflow.log_metric("val_loss", val_loss.avg, step=epoch)
             mlflow.log_metrics(val_metrics.to_dict(prefix="val_"), step=epoch)
 
