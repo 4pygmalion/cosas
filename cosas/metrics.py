@@ -137,6 +137,14 @@ def calculate_metrics(
 
 
 def specificity_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    specificity = tn / (tn + fp) if (tn + fp) != 0 else 0.0
-    return specificity
+    try:
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    except ValueError:
+        if sum(y_true) + sum(y_pred) == 0:
+            tn = int(confusion_matrix(y_true, y_pred).ravel())
+            fp = 0
+            fn = 0
+            tp = 0
+    finally:
+        specificity = tn / (tn + fp) if (tn + fp) != 0 else 0.0
+        return specificity
