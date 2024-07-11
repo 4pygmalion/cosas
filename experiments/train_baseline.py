@@ -11,7 +11,7 @@ import torch.multiprocessing as mp
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
-from cosas.datasets import COSASdataset
+from cosas.datasets import Patchdataset, WholeSizeDataset
 from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
@@ -47,25 +47,19 @@ if __name__ == "__main__":
     )
     test_transform = A.Compose(
         [
-            A.RandomCrop(height=224, width=224, p=1),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
     )
 
-    train_dataset = COSASdataset(train_images, train_masks, train_transform)
+    train_dataset = Patchdataset(train_images, train_masks, train_transform)
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         persistent_workers=True,
     )
-    val_dataloader = DataLoader(
-        COSASdataset(val_images, val_masks, test_transform),
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        persistent_workers=True,
-    )
+    val_dataset = WholeSizeDataset(val_images, val_masks, test_transform)
 
     n_steps = len(train_dataloader)
     trainer = BinaryClassifierTrainer(
@@ -82,19 +76,17 @@ if __name__ == "__main__":
         mlflow.log_params(args.__dict__)
         trainer.train(
             train_dataloader,
-            val_dataloader,
+            val_dataset,
             args.epochs,
             args.n_patience,
         )
         mlflow.pytorch.log_model(trainer.model, "model")
 
-        test_dataloader = DataLoader(
-            COSASdataset(test_images, test_masks, test_transform),
-            batch_size=args.batch_size,
-            shuffle=False,
+        test_dataset = WholeSizeDataset(
+            test_images,
+            test_masks,
+            test_transform,
         )
-        test_loss, test_metrics = trainer.run_epoch(
-            "test", epoch=args.epochs, dataloader=test_dataloader
-        )
+        test_loss, test_metrics = trainer.test(test_dataset, "test", threshold=0.5)
         mlflow.log_metric("test_loss", test_loss.avg)
         mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
