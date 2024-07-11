@@ -130,7 +130,7 @@ class BinaryClassifierTrainer(ABC):
             loss_meter.update(loss.item(), len(ys))
 
             confidences = torch.sigmoid(logits).flatten()
-            flatten_ys = ys.flatten()
+            flatten_ys: torch.Tensor = ys.flatten()
             metrics_meter.update(
                 calculate_metrics(
                     confidences.detach().cpu().numpy(),
@@ -155,7 +155,9 @@ class BinaryClassifierTrainer(ABC):
         return (loss_meter, metrics_meter)
 
     @torch.no_grad()
-    def test(self, test_dataset: WholeSizeDataset, phase: str, threshold=0.5):
+    def test(
+        self, test_dataset: WholeSizeDataset, phase: str, epoch: int, threshold=0.5
+    ):
         self.model.eval()
 
         n_data = len(test_dataset)
@@ -171,7 +173,7 @@ class BinaryClassifierTrainer(ABC):
             loss_meter.update(loss.item())
 
             confidences = torch.sigmoid(logits).flatten()
-            flatten_ys = y.flatten()
+            flatten_ys: torch.Tensor = y.flatten()
             metrics_meter.update(
                 calculate_metrics(
                     confidences.detach().cpu().numpy(),
@@ -182,7 +184,7 @@ class BinaryClassifierTrainer(ABC):
 
             bar.suffix = self.make_bar_sentence(
                 phase=phase,
-                epoch=0,
+                epoch=epoch,
                 step=step,
                 total_step=n_data,
                 eta=bar.eta,
@@ -211,7 +213,7 @@ class BinaryClassifierTrainer(ABC):
             mlflow.log_metric("train_loss", train_loss.avg, step=epoch)
             mlflow.log_metrics(train_metrics.to_dict(prefix="train_"), step=epoch)
 
-            val_loss, val_metrics = self.test(val_dataset, phase="val")
+            val_loss, val_metrics = self.test(val_dataset, epoch=epoch, phase="val")
             mlflow.log_metric("val_loss", val_loss.avg, step=epoch)
             mlflow.log_metrics(val_metrics.to_dict(prefix="val_"), step=epoch)
 
