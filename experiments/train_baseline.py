@@ -89,7 +89,7 @@ if __name__ == "__main__":
             test_transform,
         )
         test_loss, test_metrics = trainer.test(
-            test_dataset, phase="test", threshold=0.5
+            test_dataset, phase="test", epoch=0, threshold=0.5, save_plot=True
         )
         mlflow.log_metric("test_loss", test_loss.avg)
         mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))

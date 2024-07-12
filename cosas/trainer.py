@@ -4,14 +4,13 @@ from typing import Tuple, Dict
 from abc import ABC, abstractmethod
 
 import mlflow
-from scipy.special import softmax
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
 from progress.bar import Bar
 from sklearn.metrics import roc_auc_score
 
+from .tracking import plot_and_save
 from .metrics import Metrics, AverageMeter, calculate_metrics
 from .datasets import WholeSizeDataset
 
@@ -156,7 +155,12 @@ class BinaryClassifierTrainer(ABC):
 
     @torch.no_grad()
     def test(
-        self, test_dataset: WholeSizeDataset, phase: str, epoch: int, threshold=0.5
+        self,
+        test_dataset: WholeSizeDataset,
+        phase: str,
+        epoch: int,
+        threshold=0.5,
+        save_plot: bool = False,
     ):
         self.model.eval()
 
@@ -172,15 +176,25 @@ class BinaryClassifierTrainer(ABC):
             # metric
             loss_meter.update(loss.item())
 
-            confidences = torch.sigmoid(logits).flatten()
-            flatten_ys: torch.Tensor = y.flatten()
+            confidences = torch.sigmoid(logits)
+            flat_confidences = confidences.flatten()
+            flat_ys: torch.Tensor = y.flatten()
             metrics_meter.update(
                 calculate_metrics(
-                    confidences.detach().cpu().numpy(),
-                    flatten_ys.detach().cpu().numpy(),
+                    flat_confidences.detach().cpu().numpy(),
+                    flat_ys.detach().cpu().numpy(),
                     threshold=threshold,
                 )
             )
+
+            if save_plot:
+                plot_and_save(
+                    image_name=f"step_{step}",
+                    original_x=test_dataset.images[step],
+                    original_y=test_dataset.masks[step],
+                    pred_y=confidences >= 0.5,
+                    artifact_dir="test_prediction",
+                )
 
             bar.suffix = self.make_bar_sentence(
                 phase=phase,
@@ -213,7 +227,9 @@ class BinaryClassifierTrainer(ABC):
             mlflow.log_metric("train_loss", train_loss.avg, step=epoch)
             mlflow.log_metrics(train_metrics.to_dict(prefix="train_"), step=epoch)
 
-            val_loss, val_metrics = self.test(val_dataset, epoch=epoch, phase="val")
+            val_loss, val_metrics = self.test(
+                val_dataset, epoch=epoch, phase="val", save_plot=False
+            )
             mlflow.log_metric("val_loss", val_loss.avg, step=epoch)
             mlflow.log_metrics(val_metrics.to_dict(prefix="val_"), step=epoch)
 

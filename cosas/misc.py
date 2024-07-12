@@ -1,13 +1,16 @@
 import argparse
+from io import BytesIO
 from typing import Tuple
 
 import random
 import numpy as np
 import torch
-
+from torchvision.transforms import ToPILImage
+from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
 
 from .data_model import COSASData, Scanncers
+from .transforms import remove_pad, reverse_tesellation
 
 
 def get_config() -> argparse.ArgumentParser:
@@ -78,3 +81,39 @@ def train_val_split(
         (val_images, val_masks),
         (test_images, test_masks),
     )
+
+
+def plot_xypred(
+    original_x: np.ndarray,
+    original_y: np.ndarray,
+    pred_y: torch.Tensor,
+):
+    """patches을 다시 original size으로 concat하여 이미지를 시각화함
+
+    Note:
+        어짜피 test time에 사용할거여서 original x, y받아도 될듯
+
+    Args:
+        pred_y (torch.Tensor): predicted class, or confidences
+    """
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    original_size = original_y.shape
+
+    to_original = lambda x: remove_pad(
+        reverse_tesellation(x, original_size), original_size
+    )
+
+    axes[0].imshow(original_x)
+    axes[0].set_title("Input X")
+
+    axes[1].imshow(original_y, cmap="gray")
+    axes[1].set_title("Ground Truth")
+
+    pred_y = to_original(pred_y)
+    axes[2].imshow(ToPILImage()(pred_y), cmap="gray")
+    axes[2].set_title("Prediction")
+
+    plt.tight_layout()
+
+    return fig, axes
