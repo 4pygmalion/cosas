@@ -103,6 +103,20 @@ def compute_dice(pred: np.ndarray, target: np.ndarray) -> float:
     return dice
 
 
+def specificity_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    try:
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    except ValueError:
+        if sum(y_true) + sum(y_pred) == 0:
+            tn = int(confusion_matrix(y_true, y_pred).ravel())
+            fp = 0
+            fn = 0
+            tp = 0
+    finally:
+        specificity = tn / (tn + fp) if (tn + fp) != 0 else 0.0
+        return specificity
+
+
 def calculate_metrics(
     confidences: np.ndarray, targets: np.ndarray, threshold=0.5
 ) -> Dict[str, float]:
@@ -112,15 +126,22 @@ def calculate_metrics(
 
     f1 = f1_score(target_flat, pred_label)
     acc = accuracy_score(target_flat, pred_label)
-    sen = recall_score(target_flat, pred_label)
     spec = specificity_score(target_flat, pred_label)
-    auroc = (
-        roc_auc_score(target_flat, pred_confidence)
-        if len(np.unique(target_flat)) > 1
-        else 0.0
-    )
-    pr, rc, _ = precision_recall_curve(target_flat, pred_confidence)
-    prauc = auc(rc, pr)
+
+    if target_flat.sum() == 0:
+        sen = 0
+        auroc = 0
+        prauc = 0
+    else:
+        sen = recall_score(target_flat, pred_label)
+        auroc = (
+            roc_auc_score(target_flat, pred_confidence)
+            if len(np.unique(target_flat)) > 1
+            else 0.0
+        )
+        pr, rc, _ = precision_recall_curve(target_flat, pred_confidence)
+        prauc = auc(rc, pr)
+
     iou = compute_iou(pred_label, target_flat)
     dice = compute_dice(pred_label, target_flat)
 
@@ -134,17 +155,3 @@ def calculate_metrics(
         "iou": iou,
         "dice": dice,
     }
-
-
-def specificity_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    try:
-        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    except ValueError:
-        if sum(y_true) + sum(y_pred) == 0:
-            tn = int(confusion_matrix(y_true, y_pred).ravel())
-            fp = 0
-            fn = 0
-            tp = 0
-    finally:
-        specificity = tn / (tn + fp) if (tn + fp) != 0 else 0.0
-        return specificity
