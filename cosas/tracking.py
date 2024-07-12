@@ -33,10 +33,10 @@ def plot_and_save(
     temp_save_path = f"{image_name}.png"
     fig, axes = plot_xypred(original_x, original_y, pred_y)
     fig.savefig(temp_save_path)
+    plt.clf()
+    plt.cla()
+    plt.close()
 
     mlflow.log_artifact(temp_save_path, artifact_dir)
 
     os.remove(temp_save_path)
-    plt.close(fig)
-    plt.clf()
-    plt.cla()
