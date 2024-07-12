@@ -1,6 +1,7 @@
 import math
 import logging
-from typing import Tuple, Dict
+from copy import deepcopy
+from typing import Tuple
 from abc import ABC, abstractmethod
 
 import mlflow
@@ -236,10 +237,13 @@ class BinaryClassifierTrainer(ABC):
             if val_loss.avg < best_loss:
                 best_loss = val_loss.avg
                 patience = 0
+                best_state_dict = deepcopy(self.model.state_dict())
             else:
                 patience += 1
                 if patience >= n_patience:
                     self.logger.info("Early stopping after epoch {}".format(epoch))
                     break
+
+        self.model.load_state_dict(best_state_dict)
 
         return train_loss, train_metrics, val_loss, val_metrics
