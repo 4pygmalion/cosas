@@ -45,7 +45,9 @@ def set_seed(seed: int) -> None:
 
 
 def train_val_split(
-    cosas_data: COSASData, train_val_test: Tuple[float, float, float]
+    cosas_data: COSASData,
+    train_val_test: Tuple[float, float, float],
+    random_seed: int = 42,
 ) -> Tuple:
     train_images = list()
     val_images = list()
@@ -64,10 +66,13 @@ def train_val_split(
 
         # slide using random indices
         train_val_images, test_images, train_val_masks, test_masks = train_test_split(
-            images, masks, test_size=test_size, random_state=42
+            images, masks, test_size=test_size, random_state=random_seed
         )
         train_images, val_images, train_masks, val_masks = train_test_split(
-            train_val_images, train_val_masks, test_size=val_size, random_state=42
+            train_val_images,
+            train_val_masks,
+            test_size=val_size,
+            random_state=random_seed,
         )
 
         train_images.extend(train_images)
@@ -87,7 +92,7 @@ def train_val_split(
 def plot_xypred(
     original_x: np.ndarray,
     original_y: np.ndarray,
-    pred_y: torch.Tensor,
+    pred_masks: torch.Tensor,
 ):
     """patches을 다시 original size으로 concat하여 이미지를 시각화함
 
@@ -108,11 +113,11 @@ def plot_xypred(
     axes[0].imshow(original_x)
     axes[0].set_title("Input X")
 
-    axes[1].imshow(original_y, cmap="gray")
+    axes[1].imshow(original_y, cmap="gray", vmin=0, vmax=1)
     axes[1].set_title("Ground Truth")
 
-    pred_y = to_original(pred_y)
-    axes[2].imshow(ToPILImage()(pred_y), cmap="gray")
+    pred_y = to_original(pred_masks)
+    axes[2].imshow(ToPILImage()(pred_y), cmap="gray", vmin=0, vmax=1)
     axes[2].set_title("Prediction")
 
     plt.tight_layout()
