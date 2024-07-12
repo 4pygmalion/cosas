@@ -19,7 +19,7 @@ from cosas.tracking import TRACKING_URI, get_experiment
 if __name__ == "__main__":
     mp.set_start_method("spawn")
     args = get_config()
-    set_seed(42)
+    # set_seed(42)
 
     cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
     cosas_data.load()
@@ -37,7 +37,6 @@ if __name__ == "__main__":
 
     train_transform = A.Compose(
         [
-            A.RandomCrop(height=224, width=224, p=1),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             # TODO: RandomRotation90 추가
