@@ -50,10 +50,10 @@ class ScannerData:
 
     def __getitem__(self, idx):
         if isinstance(idx, int):
-            return self.image[idx], self.mask[idx]
+            return self.images[idx], self.masks[idx]
 
         if isinstance(idx, slice):
-            return [(self.image[i], self.mask[i]) for i in idx]
+            return [(self.images[i], self.masks[i]) for i in idx]
 
 
 class Scanncers(Enum):
