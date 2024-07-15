@@ -17,7 +17,6 @@ from cosas.trainer import BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
 
 if __name__ == "__main__":
-    mp.set_start_method("spawn")
     args = get_config()
     # set_seed(42)
 
@@ -51,20 +50,20 @@ if __name__ == "__main__":
         ]
     )
 
-    train_dataset = Patchdataset(train_images, train_masks, train_transform)
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        persistent_workers=True,
+    train_dataset = Patchdataset(
+        train_images, train_masks, train_transform, device=args.device
     )
-    val_dataset = WholeSizeDataset(val_images, val_masks, test_transform)
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size)
+    val_dataset = WholeSizeDataset(
+        val_images, val_masks, test_transform, device=args.device
+    )
 
     n_steps = len(train_dataloader)
     trainer = BinaryClassifierTrainer(
         model,
         torch.nn.functional.binary_cross_entropy_with_logits,
         optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+        device=args.device,
     )
 
     mlflow.set_tracking_uri(TRACKING_URI)
@@ -86,6 +85,7 @@ if __name__ == "__main__":
             test_images,
             test_masks,
             test_transform,
+            device=args.device,
         )
         test_loss, test_metrics = trainer.test(
             test_dataset, phase="test", epoch=0, threshold=0.5, save_plot=True
