@@ -6,8 +6,8 @@ from abc import ABC, abstractmethod
 
 import mlflow
 import torch
+import numpy as np
 from torch.utils.data import DataLoader
-from matplotlib import pyplot as plt
 from progress.bar import Bar
 from sklearn.metrics import roc_auc_score
 
@@ -42,12 +42,14 @@ class BinaryClassifierTrainer(ABC):
         self,
         model: torch.nn.modules.Module,
         loss: torch.nn.modules.loss._Loss,
+        device: str = "cuda",
         optimizer: torch.optim.Optimizer = None,
         logger: logging.Logger = None,
     ):
         self.model = model
         self.loss = loss
         self.optimizer = optimizer
+        self.device = device
         self.logger = (
             logging.Logger("BinaryClassifierTrainer") if logger is None else logger
         )
@@ -77,13 +79,14 @@ class BinaryClassifierTrainer(ABC):
             str: progressbar senetence
 
         """
-        metric_sentence = "|".join(
+        metric_sentence = " | ".join(
             [f"{k}: {v:.4f}" for k, v in metrics.to_dict().items()]
         )
 
         return (
             f"{phase} | EPOCH {epoch}: [{step}/{total_step}] | "
-            f"eta:{eta} | total_loss: {total_loss:.4f} | "
+            f"eta:{eta} | EPOCH status ==> "
+            f"total_loss: {total_loss:.4f} | "
             f"{metric_sentence}"
         )
 
@@ -108,17 +111,21 @@ class BinaryClassifierTrainer(ABC):
         Returns:
             Tuple: loss, accuracy, top_k_recall
         """
+
+        # init
+        self.model.train()
+
         total_step = len(dataloader)
         bar = Bar(max=total_step, check_tty=False)
 
+        epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-        metrics_meter = Metrics()
         for step, batch in enumerate(dataloader):
             xs, ys = batch
+            xs = xs.to(self.device)
+            ys = ys.to(self.device)
 
-            self.model.train()
             logits = self.model(xs)
-
             logits = logits.view(ys.shape)
             loss = self.loss(logits, ys.float())
 
@@ -129,12 +136,13 @@ class BinaryClassifierTrainer(ABC):
             # metric
             loss_meter.update(loss.item(), len(ys))
 
-            confidences = torch.sigmoid(logits).flatten()
-            flatten_ys: torch.Tensor = ys.flatten()
-            metrics_meter.update(
+            confidences = torch.sigmoid(logits).flatten().detach().cpu().numpy()
+            ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
+
+            epoch_metrics.update(
                 calculate_metrics(
-                    confidences.detach().cpu().numpy(),
-                    flatten_ys.detach().cpu().numpy(),
+                    confidences,
+                    ground_truths,
                     threshold=threshold,
                 )
             )
@@ -146,13 +154,13 @@ class BinaryClassifierTrainer(ABC):
                 total_step=total_step,
                 eta=bar.eta,
                 total_loss=loss_meter.avg,
-                metrics=metrics_meter,
+                metrics=epoch_metrics,
             )
             bar.next()
 
         bar.finish()
 
-        return (loss_meter, metrics_meter)
+        return (loss_meter, epoch_metrics)
 
     @torch.no_grad()
     def test(
@@ -163,12 +171,12 @@ class BinaryClassifierTrainer(ABC):
         threshold=0.5,
         save_plot: bool = False,
     ):
+        # init
         self.model.eval()
-
         n_data = len(test_dataset)
         loss_meter = AverageMeter("loss")
-        metrics_meter = Metrics()
         bar = Bar(max=n_data, check_tty=False)
+        epoch_metrics = Metrics()
         for step, (x, y) in enumerate(test_dataset):
             logits = self.model(x)  # (B, C, W, H)
             logits = logits.view(y.shape)
@@ -177,13 +185,13 @@ class BinaryClassifierTrainer(ABC):
             # metric
             loss_meter.update(loss.item())
 
-            confidences = torch.sigmoid(logits)
-            flat_confidences = confidences.flatten()
-            flat_ys: torch.Tensor = y.flatten()
-            metrics_meter.update(
+            confidences = torch.sigmoid(logits).flatten().detach().cpu().numpy()
+            ground_truths: torch.Tensor = y.flatten().detach().cpu().numpy()
+
+            epoch_metrics.update(
                 calculate_metrics(
-                    flat_confidences.detach().cpu().numpy(),
-                    flat_ys.detach().cpu().numpy(),
+                    confidences,
+                    ground_truths,
                     threshold=threshold,
                 )
             )
@@ -204,13 +212,13 @@ class BinaryClassifierTrainer(ABC):
                 total_step=n_data,
                 eta=bar.eta,
                 total_loss=loss_meter.avg,
-                metrics=metrics_meter,
+                metrics=epoch_metrics,
             )
             bar.next()
 
         bar.finish()
 
-        return (loss_meter, metrics_meter)
+        return (loss_meter, epoch_metrics)
 
     def train(
         self,
