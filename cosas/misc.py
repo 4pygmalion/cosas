@@ -14,6 +14,10 @@ from .transforms import remove_pad, reverse_tesellation
 
 
 def get_config() -> argparse.ArgumentParser:
+    """
+    Note:
+        num_workers 필요없음. 이미 메모리에 다 올려서 필요없는듯
+    """
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -21,9 +25,8 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-    parser.add_argument("--num_workers", type=int, default=1, help="Number of workers")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
-    parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
 
     parser.add_argument(
         "--n_patience", type=int, default=7, help="Number of patience epochs"
