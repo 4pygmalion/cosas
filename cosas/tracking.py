@@ -26,7 +26,7 @@ def get_experiment(experiment_name=EXP_NAME):
 def plot_and_save(
     image_name: str,
     original_x: np.ndarray,
-    original_y: tuple,
+    original_y: np.ndarray,
     pred_y: torch.Tensor,
     artifact_dir: str,
 ):

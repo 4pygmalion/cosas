@@ -185,12 +185,14 @@ class BinaryClassifierTrainer(ABC):
             # metric
             loss_meter.update(loss.item())
 
-            confidences = torch.sigmoid(logits).flatten().detach().cpu().numpy()
-            ground_truths: torch.Tensor = y.flatten().detach().cpu().numpy()
+            # 여기 바꿔야함 view() takes from 0 to 2 positional arguments but 5 were given
+            confidences = torch.sigmoid(logits)
+            flat_confidences = confidences.flatten().cpu().numpy()
+            ground_truths: torch.Tensor = y.flatten().cpu().numpy()
 
             epoch_metrics.update(
                 calculate_metrics(
-                    confidences,
+                    flat_confidences,
                     ground_truths,
                     threshold=threshold,
                 )
