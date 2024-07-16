@@ -118,11 +118,13 @@ def specificity_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def calculate_metrics(
-    confidences: np.ndarray, targets: np.ndarray, threshold=0.5
+    confidences: np.ndarray,
+    targets: np.ndarray,
+    threshold=0.5,
 ) -> Dict[str, float]:
-    pred_confidence = confidences.flatten()
+    pred_confidence = confidences
     pred_label = pred_confidence >= threshold
-    target_flat = targets.flatten()
+    target_flat = targets
 
     f1 = f1_score(target_flat, pred_label)
     acc = accuracy_score(target_flat, pred_label)

@@ -14,6 +14,10 @@ from .transforms import remove_pad, reverse_tesellation
 
 
 def get_config() -> argparse.ArgumentParser:
+    """
+    Note:
+        num_workers 필요없음. 이미 메모리에 다 올려서 필요없는듯
+    """
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -21,9 +25,8 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-    parser.add_argument("--num_workers", type=int, default=1, help="Number of workers")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
-    parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
 
     parser.add_argument(
         "--n_patience", type=int, default=7, help="Number of patience epochs"
@@ -89,6 +92,37 @@ def train_val_split(
     )
 
 
+def plot_patch_xypred(
+    original_x: np.ndarray,
+    original_y: np.ndarray,
+    pred_masks: np.ndarray,
+):
+    """patches을 다시 original size으로 concat하여 이미지를 시각화함
+
+    Note:
+        어짜피 test time에 사용할거여서 original x, y받아도 될듯
+
+    Args:
+        pred_y (torch.Tensor): predicted class, or confidences
+                               (N, 224, 224, 1)
+    """
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    axes[0].imshow(original_x)
+    axes[0].set_title("Input X")
+
+    axes[1].imshow(original_y, cmap="gray", vmin=0, vmax=1)
+    axes[1].set_title("Ground Truth")
+
+    axes[2].imshow(pred_masks, cmap="gray", vmin=0, vmax=1)
+    axes[2].set_title("Prediction")
+
+    plt.tight_layout()
+
+    return fig, axes
+
+
 def plot_xypred(
     original_x: np.ndarray,
     original_y: np.ndarray,
@@ -101,6 +135,7 @@ def plot_xypred(
 
     Args:
         pred_y (torch.Tensor): predicted class, or confidences
+                               (N, 224, 224, 1)
     """
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
@@ -116,7 +151,7 @@ def plot_xypred(
     axes[1].imshow(original_y, cmap="gray", vmin=0, vmax=1)
     axes[1].set_title("Ground Truth")
 
-    pred_y = to_original(pred_masks)
+    pred_y = to_original(pred_masks.permute(0, 3, 2, 1))
     axes[2].imshow(ToPILImage()(pred_y), cmap="gray", vmin=0, vmax=1)
     axes[2].set_title("Prediction")
 

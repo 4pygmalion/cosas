@@ -95,7 +95,6 @@ def reverse_tesellation(patches: torch.Tensor, original_size: tuple) -> torch.Te
     n_patches_h = math.ceil(original_height / patch_h)
     n_patches_w = math.ceil(original_width / patch_w)
 
-    # 패치 텐서를 (n_patches_h, n_patches_w, C, patch_h, patch_w)로 변형
     patches = patches.view(n_patches_h, n_patches_w, C, patch_h, patch_w)
 
     original_image = torch.zeros(C, n_patches_h * patch_h, n_patches_w * patch_w)
