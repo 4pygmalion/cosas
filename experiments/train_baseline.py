@@ -18,7 +18,7 @@ from cosas.tracking import TRACKING_URI, get_experiment
 
 if __name__ == "__main__":
     args = get_config()
-    # set_seed(42)
+    set_seed(42)
 
     cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
     cosas_data.load()
@@ -27,12 +27,13 @@ if __name__ == "__main__":
         train_val_split(cosas_data, train_val_test=(0.6, 0.2, 0.2))
     )
 
-    model = smp.FPN(
-        encoder_name="resnet34",
+    model = smp.Unet(
+        encoder_name="efficientnet-b0",
         encoder_weights="imagenet",
         classes=1,
         activation=None,
     ).to(args.device)
+    dp_model = torch.nn.DataParallel(model)
 
     train_transform = A.Compose(
         [
@@ -54,14 +55,14 @@ if __name__ == "__main__":
         train_images, train_masks, train_transform, device=args.device
     )
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size)
-    val_dataset = WholeSizeDataset(
+    val_dataset = Patchdataset(
         val_images, val_masks, test_transform, device=args.device
     )
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
 
-    n_steps = len(train_dataloader)
     trainer = BinaryClassifierTrainer(
-        model,
-        torch.nn.functional.binary_cross_entropy_with_logits,
+        model=dp_model,
+        loss=torch.nn.functional.binary_cross_entropy_with_logits,
         optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
         device=args.device,
     )
@@ -73,22 +74,24 @@ if __name__ == "__main__":
     ):
         mlflow.log_params(args.__dict__)
         mlflow.log_artifact(os.path.abspath(__file__))
+
         trainer.train(
             train_dataloader,
-            val_dataset,
-            args.epochs,
-            args.n_patience,
+            val_dataloader,
+            epochs=args.epochs,
+            n_patience=args.n_patience,
         )
-        mlflow.pytorch.log_model(trainer.model, "model")
+        mlflow.pytorch.log_model(model, "model")
 
-        test_dataset = WholeSizeDataset(
+        test_dataset = Patchdataset(
             test_images,
             test_masks,
             test_transform,
             device=args.device,
         )
-        test_loss, test_metrics = trainer.test(
-            test_dataset, phase="test", epoch=0, threshold=0.5, save_plot=True
+        test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
+        test_loss, test_metrics = trainer.run_epoch(
+            test_dataloder, phase="test", epoch=0, threshold=0.5, save_plot=True
         )
         mlflow.log_metric("test_loss", test_loss.avg)
         mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
