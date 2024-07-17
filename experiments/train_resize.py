@@ -1,21 +1,23 @@
 import os
 
+import numpy as np
 import mlflow
 import segmentation_models_pytorch as smp
 import torch
 import albumentations as A
 from torch.utils.data import DataLoader
 from albumentations.pytorch.transforms import ToTensorV2
-import torch.multiprocessing as mp
+from albumentations.core.transforms_interface import ImageOnlyTransform
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
-from cosas.datasets import Patchdataset
+from cosas.datasets import ImageMaskDataset
 from cosas.transforms import CopyTransform
 from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
+
 
 if __name__ == "__main__":
     args = get_config()
@@ -38,6 +40,7 @@ if __name__ == "__main__":
 
     train_transform = A.Compose(
         [
+            A.Resize(224, 224),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
@@ -48,19 +51,27 @@ if __name__ == "__main__":
     )
     test_transform = A.Compose(
         [
+            A.Resize(224, 224),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
     )
 
-    train_dataset = Patchdataset(
+    train_dataset = ImageMaskDataset(
         train_images, train_masks, train_transform, device=args.device
     )
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size)
-    val_dataset = Patchdataset(
+    val_dataset = ImageMaskDataset(
         val_images, val_masks, test_transform, device=args.device
     )
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
+    test_dataset = ImageMaskDataset(
+        test_images,
+        test_masks,
+        test_transform,
+        device=args.device,
+    )
+    test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
     trainer = BinaryClassifierTrainer(
         model=dp_model,
@@ -85,13 +96,6 @@ if __name__ == "__main__":
         )
         mlflow.pytorch.log_model(model, "model")
 
-        test_dataset = Patchdataset(
-            test_images,
-            test_masks,
-            test_transform,
-            device=args.device,
-        )
-        test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
         test_loss, test_metrics = trainer.run_epoch(
             test_dataloder, phase="test", epoch=0, threshold=0.5, save_plot=True
         )
