@@ -9,8 +9,8 @@ def test_get_image_stats():
     # get image stats
     means, stds = get_image_stats(images)
 
-    assert means.shape == (3,)
-    assert stds.shape == (3,)
+    assert len(means) == 3
+    assert len(stds) == 3
 
 
 def test_get_image_stats_list():
@@ -23,5 +23,5 @@ def test_get_image_stats_list():
     # get image stats
     means, stds = get_image_stats(images)
 
-    assert means.shape == (3,)
-    assert stds.shape == (3,)
+    assert len(means) == 3
+    assert len(stds) == 3

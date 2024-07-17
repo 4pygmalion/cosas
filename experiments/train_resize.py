@@ -8,11 +8,10 @@ import albumentations as A
 from torch.utils.data import DataLoader
 from albumentations.pytorch.transforms import ToTensorV2
 
-from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
 from cosas.datasets import ImageMaskDataset
-from cosas.transforms import CopyTransform
+from cosas.transforms import CopyTransform, get_image_stats
 from cosas.losses import DiceXentropy
 from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
@@ -21,13 +20,15 @@ from cosas.tracking import TRACKING_URI, get_experiment
 
 if __name__ == "__main__":
     args = get_config()
-    set_seed(42)
+    set_seed(args.seed)
 
     cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
     cosas_data.load()
 
     (train_images, train_masks), (val_images, val_masks), (test_images, test_masks) = (
-        train_val_split(cosas_data, train_val_test=(0.6, 0.2, 0.2))
+        train_val_split(
+            cosas_data, train_val_test=(0.6, 0.2, 0.2), random_seed=args.seed
+        )
     )
 
     model = smp.FPN(
@@ -36,15 +37,18 @@ if __name__ == "__main__":
         classes=1,
         activation=None,
     ).to(args.device)
-    # dp_model = torch.nn.DataParallel(model, output_device=args.device) # TODO
+    # dp_model = torch.nn.DataParallel(model, output_device=args.device)  # TODO
 
+    # means, stds = get_image_stats(train_images)
+    means = [0.485, 0.456, 0.406]
+    stds = [0.229, 0.224, 0.225]
     train_transform = A.Compose(
         [
             A.Resize(224, 224),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            A.Normalize(mean=means, std=stds),
             CopyTransform(p=1),
             ToTensorV2(),
         ]
@@ -52,7 +56,7 @@ if __name__ == "__main__":
     test_transform = A.Compose(
         [
             A.Resize(224, 224),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            A.Normalize(mean=means, std=stds),
             ToTensorV2(),
         ]
     )
