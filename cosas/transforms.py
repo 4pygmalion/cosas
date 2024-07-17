@@ -1,8 +1,50 @@
 import math
+from typing import Tuple, List
+
 import numpy as np
 import torch
 import albumentations as A
 from torchvision.transforms.functional import pad
+
+
+def get_image_stats(
+    images: np.ndarray | List[np.ndarray],
+) -> Tuple[tuple, tuple]:
+    """
+    이미지 배열의 평균 및 표준 편차를 계산합니다.
+
+    이 함수는 입력된 이미지 배열이 4차원 배열인지 확인하고,
+    각 차원에 대해 평균 및 표준 편차를 계산하여 반환합니다.
+
+    Params:
+        images (np.ndarray): 4차원 이미지 배열 (B, W, H, C)
+
+    Returns:
+        Tuple[tuple, tuple]: 이미지 배열의 평균과 표준 편차.
+
+    Exception:
+        ValueError: 입력된 이미지 배열이 4차원 배열이 아닐 경우 발생.
+    """
+    if isinstance(images, list):
+        means = list()
+        stds = list()
+        for image in images:
+            means.append(image.mean(axis=(0, 1)))
+            stds.append(image.std(axis=(0, 1)))
+
+        means = np.array(means).mean(axis=0)
+        stds = np.array(stds).mean(axis=0)
+
+    if isinstance(images, np.ndarray):
+        if images.ndim != 4:
+            raise ValueError(
+                f"Input images array must be 4-dimensional, passed images.ndim({images.ndim})"
+            )
+
+        means = np.mean(images, axis=(0, 1, 2))
+        stds = np.std(images, axis=(0, 1, 2))
+
+    return tuple(means), tuple(stds)
 
 
 def pad_image_tensor(

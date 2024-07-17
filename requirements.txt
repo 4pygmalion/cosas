@@ -12,3 +12,6 @@ torchaudio
 
 segmentation-models-pytorch
 albumentations 
+
+# for CI
+pytest==8.2.2
