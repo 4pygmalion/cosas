@@ -7,13 +7,13 @@ import torch
 import albumentations as A
 from torch.utils.data import DataLoader
 from albumentations.pytorch.transforms import ToTensorV2
-from albumentations.core.transforms_interface import ImageOnlyTransform
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
 from cosas.datasets import ImageMaskDataset
 from cosas.transforms import CopyTransform
+from cosas.losses import DiceXentropy
 from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
@@ -36,7 +36,7 @@ if __name__ == "__main__":
         classes=1,
         activation=None,
     ).to(args.device)
-    dp_model = torch.nn.DataParallel(model)
+    # dp_model = torch.nn.DataParallel(model, output_device=args.device) # TODO
 
     train_transform = A.Compose(
         [
@@ -73,9 +73,10 @@ if __name__ == "__main__":
     )
     test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
+    dice_bce_loss = DiceXentropy()
     trainer = BinaryClassifierTrainer(
-        model=dp_model,
-        loss=torch.nn.functional.binary_cross_entropy_with_logits,
+        model=model,  # TODO
+        loss=dice_bce_loss,
         optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
         device=args.device,
     )

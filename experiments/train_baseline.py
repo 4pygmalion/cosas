@@ -13,6 +13,7 @@ from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
 from cosas.datasets import Patchdataset
 from cosas.transforms import CopyTransform
+from cosas.losses import DiceXentropy
 from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
@@ -62,9 +63,10 @@ if __name__ == "__main__":
     )
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
 
+    dice_bce_loss = DiceXentropy()
     trainer = BinaryClassifierTrainer(
         model=dp_model,
-        loss=torch.nn.functional.binary_cross_entropy_with_logits,
+        loss=dice_bce_loss,
         optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
         device=args.device,
     )
