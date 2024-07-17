@@ -104,3 +104,35 @@ class WholeSizeDataset(Dataset):
         patch_masks = patch_masks.permute(0, 2, 3, 1)  # (B, C, W, H) -> # (B, W, H, C)
 
         return patch_images.to(self.device), patch_masks.to(self.device).float()
+
+
+class ImageMaskDataset(Dataset):
+    def __init__(
+        self, images, masks, transform: A.Compose | None = None, device="cuda"
+    ):
+        self.images = images
+        self.masks = masks
+        self.transform = transform
+        self.device = device
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        image = self.images[idx]
+        mask = self.masks[idx]
+
+        # self.transform: np.ndarray -> Dict[str, Tensor]
+        if self.transform:
+            augmented = self.transform(image=image, mask=mask)
+            image, mask = augmented["image"], augmented["mask"]
+
+            # stride가 negative인 경우 처리
+            if isinstance(mask, torch.Tensor):
+                mask = torch.from_numpy(mask.numpy().copy())
+            return image, mask
+
+        else:
+            image = torch.from_numpy(image.copy())
+            mask = torch.from_numpy(mask.copy())
+            return image, mask

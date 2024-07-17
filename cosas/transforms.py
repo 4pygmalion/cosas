@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import torch
-
+import albumentations as A
 from torchvision.transforms.functional import pad
 
 
@@ -107,3 +107,18 @@ def reverse_tesellation(patches: torch.Tensor, original_size: tuple) -> torch.Te
             original_image[:, x_start:x_end, y_start:y_end] = patches[i, j]
 
     return original_image
+
+
+class CopyTransform(A.DualTransform):
+    def apply(self, img, **params):
+        if any(stride < 0 for stride in img.strides):
+            img = np.ascontiguousarray(img)
+        return img
+
+    def apply_to_mask(self, mask, **params):
+        if any(stride < 0 for stride in mask.strides):
+            mask = np.ascontiguousarray(mask)
+        return mask
+
+    def get_transform_init_args_names(self):
+        return ()
