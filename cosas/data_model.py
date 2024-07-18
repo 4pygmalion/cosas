@@ -96,10 +96,19 @@ class COSASData:
         return self
 
     @property
-    def image(self) -> List[np.ndarray]:
+    def images(self) -> List[np.ndarray]:
         images = list()
         for scanner in Scanncers:
             scanner_data: ScannerData = getattr(self, scanner.name)
             images.extend(scanner_data.images)
 
         return images
+
+    @property
+    def masks(self) -> List[np.ndarray]:
+        masks = list()
+        for scanner in Scanncers:
+            scanner_data: ScannerData = getattr(self, scanner.name)
+            masks.extend(scanner_data.masks)
+
+        return masks
