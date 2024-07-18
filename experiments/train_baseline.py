@@ -3,16 +3,13 @@ import os
 import mlflow
 import segmentation_models_pytorch as smp
 import torch
-import albumentations as A
 from torch.utils.data import DataLoader
-from albumentations.pytorch.transforms import ToTensorV2
-import torch.multiprocessing as mp
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
-from cosas.datasets import Patchdataset
-from cosas.transforms import CopyTransform
+from cosas.datasets import DATASET_REGISTRY
+from cosas.transforms import train_transform, test_transform
 from cosas.losses import DiceXentropy
 from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
@@ -37,31 +34,21 @@ if __name__ == "__main__":
     ).to(args.device)
     dp_model = torch.nn.DataParallel(model)
 
-    train_transform = A.Compose(
-        [
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            CopyTransform(p=1),
-            ToTensorV2(),
-        ]
-    )
-    test_transform = A.Compose(
-        [
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            ToTensorV2(),
-        ]
-    )
+    dataset = DATASET_REGISTRY[args.dataset]
 
-    train_dataset = Patchdataset(
+    train_dataset = dataset(
         train_images, train_masks, train_transform, device=args.device
     )
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size)
-    val_dataset = Patchdataset(
-        val_images, val_masks, test_transform, device=args.device
-    )
+    val_dataset = dataset(val_images, val_masks, test_transform, device=args.device)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
+    test_dataset = dataset(
+        test_images,
+        test_masks,
+        test_transform,
+        device=args.device,
+    )
+    test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
     dice_bce_loss = DiceXentropy()
     trainer = BinaryClassifierTrainer(
@@ -87,13 +74,6 @@ if __name__ == "__main__":
         )
         mlflow.pytorch.log_model(model, "model")
 
-        test_dataset = Patchdataset(
-            test_images,
-            test_masks,
-            test_transform,
-            device=args.device,
-        )
-        test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
         test_loss, test_metrics = trainer.run_epoch(
             test_dataloder, phase="test", epoch=0, threshold=0.5, save_plot=True
         )

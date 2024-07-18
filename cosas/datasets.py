@@ -136,3 +136,10 @@ class ImageMaskDataset(Dataset):
             image = torch.from_numpy(image.copy())
             mask = torch.from_numpy(mask.copy())
             return image, mask
+
+
+DATASET_REGISTRY = {
+    "patch": Patchdataset,
+    "whole": WholeSizeDataset,
+    "image_mask": ImageMaskDataset,
+}

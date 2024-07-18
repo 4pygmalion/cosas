@@ -26,6 +26,9 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
+    parser.add_argument(
+        "--dataset", type=str, choices=["patch", "image_mask", "wholesize"]
+    )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument(
         "--n_patience", type=int, default=10, help="Number of patience epochs"
