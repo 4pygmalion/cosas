@@ -236,5 +236,11 @@ class BinaryClassifierTrainer(ABC):
                     break
 
         self.model.load_state_dict(best_state_dict)
+        self.run_epoch(
+            dataloader=train_dataloader, epoch=epoch, phase="train_save", save_plot=True
+        )
+        self.run_epoch(
+            dataloader=val_dataloader, epoch=epoch, phase="val_save", save_plot=True
+        )
 
         return train_loss, train_metrics, val_loss, val_metrics

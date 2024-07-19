@@ -178,9 +178,8 @@ class PreAugDataset(Dataset):
         return new_image
 
     def _pre_transform(self, image, mask):
-        # replace
         negative_image = image.copy()
-        negative_image[np.where(mask == 1)] = 255
+        negative_image[np.where(mask == 1)] = 0
 
         new_size = self._sample_random_size(image.shape)
         transform = A.Compose([A.RandomCrop(*new_size), A.SafeRotate()])
