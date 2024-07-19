@@ -1,5 +1,8 @@
+import random
 from typing import Tuple, List
 
+
+import tqdm
 import torch
 import numpy as np
 import albumentations as A
@@ -138,8 +141,107 @@ class ImageMaskDataset(Dataset):
             return image, mask
 
 
+class PreAugDataset(Dataset):
+    def __init__(
+        self, images, masks, transform: A.Compose | None = None, device="cuda"
+    ):
+        self.images = images
+        self.masks = masks
+        self.transform = transform
+        self.device = device
+        self._pre_augmentation()
+
+    def _sample_random_size(self, image_shape):
+        w, h, _ = image_shape
+
+        new_w = int(random.uniform(w / 2, w))
+        new_h = int(random.uniform(h / 2, h))
+        while new_w >= w or new_h >= h or new_h <= 0 or new_w <= 0:
+            new_w = int(random.uniform(w / 2, w))
+            new_h = int(random.uniform(h / 2, h))
+
+        return new_w, new_h
+
+    def _patch_to_original(self, patch, original_shape):
+
+        new_image = np.zeros(original_shape, dtype=np.uint8)
+        h, w, _ = new_image.shape
+        ch, cw, _ = patch.shape
+
+        # 랜덤 위치 선정
+        x = np.random.randint(0, w - cw)
+        y = np.random.randint(0, h - ch)
+
+        # 배경에 패치 붙이기
+        new_image[y : y + ch, x : x + cw, :] = patch
+
+        return new_image
+
+    def _pre_transform(self, image, mask):
+        # replace
+        negative_image = image.copy()
+        negative_image[np.where(mask == 1)] = 255
+
+        new_size = self._sample_random_size(image.shape)
+        transform = A.Compose([A.RandomCrop(*new_size), A.SafeRotate()])
+        aug = transform(image=negative_image, mask=mask)
+        cropped_image = aug["image"]
+        while len(np.unique(cropped_image)) == 1:
+            aug = transform(image=negative_image, mask=mask)
+            cropped_image = aug["image"]
+        patched_image = self._patch_to_original(cropped_image, image.shape)
+
+        return patched_image, np.zeros_like(mask, dtype=np.uint8)
+
+    def _pre_augmentation(self, multiple: int = 2):
+
+        aug_images = list()
+        aug_masks = list()
+        for iter in range(multiple):
+            for image, mask in tqdm.tqdm(
+                zip(self.images, self.masks), desc="Pre-augmentation"
+            ):
+                if len(np.unique(mask)) == 1 and np.unique(mask) == np.array([1]):
+                    continue
+
+                patched_image, patched_mask = self._pre_transform(image, mask)
+                if patched_image.sum() == 0:
+                    continue
+
+                aug_images.append(patched_image)
+                aug_masks.append(patched_mask)
+
+        self.images = self.images + aug_images
+        self.masks = self.masks + aug_masks
+
+        return
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        image = self.images[idx]
+        mask = self.masks[idx]
+
+        # self.transform: np.ndarray -> Dict[str, Tensor]
+        if self.transform:
+            augmented = self.transform(image=image, mask=mask)
+            image, mask = augmented["image"], augmented["mask"]
+
+            # stride가 negative인 경우 처리
+            if isinstance(mask, torch.Tensor):
+                mask = torch.from_numpy(mask.numpy().copy())
+            return image, mask
+
+        else:
+            image = torch.from_numpy(image.copy())
+            mask = torch.from_numpy(mask.copy())
+            return image, mask
+
+
 DATASET_REGISTRY = {
     "patch": Patchdataset,
     "whole": WholeSizeDataset,
     "image_mask": ImageMaskDataset,
+    "pre_aug": PreAugDataset,
 }
