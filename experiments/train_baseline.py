@@ -27,8 +27,8 @@ if __name__ == "__main__":
     )
 
     model = smp.FPN(
-        encoder_name="resnext101_32x48d",
-        encoder_weights="instagram",
+        encoder_name=args.encoder_name,
+        encoder_weights=args.encoder_weights,
         classes=1,
         activation=None,
     ).to(args.device)

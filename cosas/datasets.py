@@ -192,7 +192,7 @@ class PreAugDataset(Dataset):
 
         return patched_image, np.zeros_like(mask, dtype=np.uint8)
 
-    def _pre_augmentation(self, multiple: int = 2):
+    def _pre_augmentation(self, multiple: int = 1):
 
         aug_images = list()
         aug_masks = list()
