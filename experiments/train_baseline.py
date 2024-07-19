@@ -39,7 +39,11 @@ if __name__ == "__main__":
     train_dataset = dataset(
         train_images, train_masks, train_transform, device=args.device
     )
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size)
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=True
+    )
+    if args.dataset == "pre_aug":
+        dataset = DATASET_REGISTRY["image_mask"]
     val_dataset = dataset(val_images, val_masks, test_transform, device=args.device)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
     test_dataset = dataset(
