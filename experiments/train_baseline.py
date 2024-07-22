@@ -19,21 +19,24 @@ if __name__ == "__main__":
     args = get_config()
     set_seed(42)
 
+    if args.smp:
+        model = smp.FPN(
+            encoder_name=args.encoder_name,
+            encoder_weights=args.encoder_weights,
+            classes=1,
+            activation=None,
+        ).to(args.device)
+    else:
+        from cosas.networks import MODEL_REGISTRY
+
+        model = MODEL_REGISTRY[args.model_name]().to(args.device)
+    dp_model = torch.nn.DataParallel(model)
+
     cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
     cosas_data.load()
-
     (train_images, train_masks), (val_images, val_masks), (test_images, test_masks) = (
         train_val_split(cosas_data, train_val_test=(0.6, 0.2, 0.2))
     )
-
-    model = smp.FPN(
-        encoder_name=args.encoder_name,
-        encoder_weights=args.encoder_weights,
-        classes=1,
-        activation=None,
-    ).to(args.device)
-    dp_model = torch.nn.DataParallel(model)
-
     dataset = DATASET_REGISTRY[args.dataset]
 
     train_dataset = dataset(

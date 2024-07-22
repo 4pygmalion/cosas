@@ -101,23 +101,29 @@ def tesellation(image_tensor: torch.Tensor, size: tuple = (224, 224)) -> torch.T
         >>> patches = torch.stack(patches)
 
     Returns
-        pathces (torch.Tensor): shape (n_patches, c, patch_h, patch_w)
+        pathces (torch.Tensor): shape (B, n_patches, c, patch_h, patch_w)
 
     """
 
-    C, W, H = image_tensor.shape
+    assert image_tensor.ndim == 4, "image_tensor must be 4-dimensional"
+    B, C, W, H = image_tensor.shape
+
     patch_w, patch_h = size
 
     # (C, W, H)
-    padded_tensor: torch.Tensor = pad_image_tensor(image_tensor)
+    # image_tensor: torch.Tensor = pad_image_tensor(image_tensor)
+    patches = image_tensor.unfold(2, patch_h, patch_h).unfold(3, patch_w, patch_w)
 
     # (C, row, W, h) -> (C, row, w, col, h, w)
-    patches = padded_tensor.unfold(1, patch_h, patch_h).unfold(2, patch_w, patch_w)
+    patches = patches.contiguous().view(B, C, -1, patch_h, patch_w)
+    patches = patches.permute(0, 2, 1, 3, 4)
 
-    return patches.permute(1, 2, 0, 3, 4).contiguous().view(-1, C, patch_h, patch_w)
+    return patches
 
 
-def reverse_tesellation(patches: torch.Tensor, original_size: tuple) -> torch.Tensor:
+def reverse_tesellation(
+    patches: torch.Tensor, original_size: tuple, device="cuda"
+) -> torch.Tensor:
     """
     Tesellation 함수에 의해 생성된 패치들을 병합하여 원래 이미지의 크기로 복원하는 함수입니다.
 
@@ -140,7 +146,9 @@ def reverse_tesellation(patches: torch.Tensor, original_size: tuple) -> torch.Te
 
     patches = patches.view(n_patches_h, n_patches_w, C, patch_h, patch_w)
 
-    original_image = torch.zeros(C, n_patches_h * patch_h, n_patches_w * patch_w)
+    original_image = torch.zeros(
+        C, n_patches_h * patch_h, n_patches_w * patch_w, device=device
+    )
     for i in range(n_patches_h):
         for j in range(n_patches_w):
             x_start = i * patch_h
@@ -169,7 +177,7 @@ class CopyTransform(A.DualTransform):
 
 train_transform = A.Compose(
     [
-        A.Resize(224, 224),
+        A.Resize(224 * 6, 224 * 6),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
@@ -180,7 +188,7 @@ train_transform = A.Compose(
 )
 test_transform = A.Compose(
     [
-        A.Resize(224, 224),
+        A.Resize(224 * 6, 224 * 6),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
     ]
