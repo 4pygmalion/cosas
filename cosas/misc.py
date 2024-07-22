@@ -13,6 +13,14 @@ from .data_model import COSASData, Scanncers
 from .transforms import remove_pad, reverse_tesellation
 
 
+class SetSMPArgs(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, "smp", True)
+        for info in values:
+            key, value = info.split(":")
+            setattr(namespace, key.strip(), value.strip())
+
+
 def get_config() -> argparse.ArgumentParser:
     """
     Note:
@@ -29,15 +37,24 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dataset",
         type=str,
-        choices=["patch", "image_mask", "wholesize", "pre_aug"],
+        choices=["patch", "image_mask", "whole", "pre_aug"],
         required=True,
     )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument(
         "--n_patience", type=int, default=10, help="Number of patience epochs"
     )
-    parser.add_argument("--encoder_name", type=str, default="resnext101_32x48d")
-    parser.add_argument("--encoder_weights", type=str, default="instagram")
+    parser.add_argument("--model_name", type=str, help="Model name")
+    parser.add_argument(
+        "--smp",
+        nargs="+",
+        action=SetSMPArgs,
+        help=(
+            "Set SMP encoder name and weights \n"
+            "For example:"
+            "--smp 'encoder_name:efficientnet-b4' 'encoder_weights:imagenet'"
+        ),
+    )
 
     return parser.parse_args()
 
