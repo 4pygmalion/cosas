@@ -20,6 +20,9 @@ from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
 
+EXP_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(EXP_DIR)
+
 if __name__ == "__main__":
     args = get_config()
     set_seed(42)
@@ -90,6 +93,7 @@ if __name__ == "__main__":
     ):
         mlflow.log_params(args.__dict__)
         mlflow.log_artifact(os.path.abspath(__file__))
+        mlflow.log_artifact(os.path.join(ROOT_DIR, "cosas", "networks.py"))
 
         trainer.train(
             train_dataloader,
