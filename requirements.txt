@@ -12,6 +12,7 @@ torchaudio
 
 segmentation-models-pytorch
 albumentations 
+histomicstk --find-links https://girder.github.io/large_image_wheels
 
 # for CI
 pytest==8.2.2

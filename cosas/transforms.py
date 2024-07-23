@@ -6,6 +6,7 @@ import torch
 import albumentations as A
 from torchvision.transforms.functional import pad
 from albumentations.pytorch.transforms import ToTensorV2
+from histomicstk.preprocessing.color_conversion import rgb_to_lab
 
 
 def get_image_stats(
@@ -46,6 +47,37 @@ def get_image_stats(
         stds = np.std(images, axis=(0, 1, 2))
 
     return tuple(means), tuple(stds)
+
+
+def get_lab_distribution(images: List[np.ndarray]):
+    """CIELAB distribution 반환"""
+    means = list()
+    stds = list()
+    for image in images:
+        lab_image = rgb_to_lab(image)
+        mean = np.mean(lab_image, axis=(0, 1))
+        means.append(mean)
+
+        std = np.std(lab_image, axis=(0, 1))
+        stds.append(std)
+
+    return np.array(means).mean(axis=0), np.array(stds).mean(axis=0)
+
+
+def find_representative_lab_image(
+    rgb_images: List[np.ndarray], means: np.ndarray
+) -> np.ndarray:
+    """평균값에 가까운 이미지 찾기"""
+    distances = list()
+    for image in rgb_images:
+        lab_image = rgb_to_lab(image)
+        mean_lab = lab_image.mean(axis=(0, 1))
+        distance = np.linalg.norm(mean_lab - means)
+        distances.append(distance)
+
+    nearest_idx = np.array(distances).argmin()
+
+    return rgb_images[nearest_idx]
 
 
 def pad_image_tensor(
@@ -177,7 +209,7 @@ class CopyTransform(A.DualTransform):
 
 train_transform = A.Compose(
     [
-        A.Resize(224 * 6, 224 * 6),
+        A.Resize(224, 224),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
@@ -188,7 +220,7 @@ train_transform = A.Compose(
 )
 test_transform = A.Compose(
     [
-        A.Resize(224 * 6, 224 * 6),
+        A.Resize(224, 224),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
     ]

@@ -9,7 +9,12 @@ from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
-from cosas.transforms import train_transform, test_transform
+from cosas.transforms import (
+    train_transform,
+    test_transform,
+    find_representative_lab_image,
+    get_lab_distribution,
+)
 from cosas.losses import DiceXentropy
 from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
@@ -38,6 +43,19 @@ if __name__ == "__main__":
         train_val_split(cosas_data, train_val_test=(0.6, 0.2, 0.2))
     )
     dataset = DATASET_REGISTRY[args.dataset]
+
+    if args.use_sn:
+        from histomicstk.preprocessing.color_normalization import reinhard
+        from histomicstk.preprocessing.color_conversion import rgb_to_lab
+
+        means, stds = get_lab_distribution(train_images)
+        reference_image = find_representative_lab_image(train_images, means)
+        lab_reference_image = rgb_to_lab(reference_image)
+        means = lab_reference_image.mean(axis=(0, 1))
+        stds = lab_reference_image.std(axis=(0, 1))
+        train_images = [reinhard(image, means, stds) for image in train_images]
+        val_images = [reinhard(image, means, stds) for image in val_images]
+        test_images = [reinhard(image, means, stds) for image in test_images]
 
     train_dataset = dataset(
         train_images, train_masks, train_transform, device=args.device

@@ -55,6 +55,7 @@ def get_config() -> argparse.ArgumentParser:
             "--smp 'encoder_name:efficientnet-b4' 'encoder_weights:imagenet'"
         ),
     )
+    parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
 
     return parser.parse_args()
 
