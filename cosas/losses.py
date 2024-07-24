@@ -27,7 +27,7 @@ class DiceXentropy(torch.nn.Module):
 
         return dice_loss + bce_loss
     
-class MCC_Loss(torch.nn.Module):
+class MCCLosswithLogits(torch.nn.Module):
     """
     Calculates the proposed Matthews Correlation Coefficient-based loss.
 
@@ -40,17 +40,23 @@ class MCC_Loss(torch.nn.Module):
     """
 
     def __init__(self):
-        super(MCC_Loss, self).__init__()
+        super(MCCLosswithLogits, self).__init__()
 
-    def forward(self, inputs, targets):
+    def forward(self, logits, targets):
         """
-        MCC = (TP.TN - FP.FN) / sqrt((TP+FP) . (TP+FN) . (TN+FP) . (TN+FN))
-        where TP, TN, FP, and FN are elements in the confusion matrix.
+        
+        Note:
+            위의 모든 코드가 logits값을 입력값으로 받고 있어서, logtis->confidence [0,1]으로 변경
+            MCC = (TP.TN - FP.FN) / sqrt((TP+FP) . (TP+FN) . (TN+FP) . (TN+FN))
+            where TP, TN, FP, and FN are elements in the confusion matrix.
+        
+        
         """
-        tp = torch.sum(torch.mul(inputs, targets))
-        tn = torch.sum(torch.mul((1 - inputs), (1 - targets)))
-        fp = torch.sum(torch.mul(inputs, (1 - targets)))
-        fn = torch.sum(torch.mul((1 - inputs), targets))
+        pred = torch.sigmoid(logits)
+        tp = torch.sum(torch.mul(pred, targets))
+        tn = torch.sum(torch.mul((1 - pred), (1 - targets)))
+        fp = torch.sum(torch.mul(pred, (1 - targets)))
+        fn = torch.sum(torch.mul((1 - pred), targets))
 
         numerator = torch.mul(tp, tn) - torch.mul(fp, fn)
         denominator = torch.sqrt(
@@ -67,5 +73,5 @@ class MCC_Loss(torch.nn.Module):
 LOSS_REGISTRY = {
     "dicebce": DiceXentropy,
     "dice": DiceLoss,
-    "mcc": MCC_Loss
+    "mcc": MCCLosswithLogits
 }
