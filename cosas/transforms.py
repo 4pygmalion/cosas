@@ -206,22 +206,24 @@ class CopyTransform(A.DualTransform):
     def get_transform_init_args_names(self):
         return ()
 
-
-train_transform = A.Compose(
-    [
-        A.Resize(224, 224),
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.RandomRotate90(p=0.5),
-        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        CopyTransform(p=1),
-        ToTensorV2(),
-    ]
-)
-test_transform = A.Compose(
-    [
-        A.Resize(224, 224),
-        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        ToTensorV2(),
-    ]
-)
+def get_transforms(input_size):
+    train_transform = A.Compose(
+        [
+            A.Resize(input_size, input_size),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            CopyTransform(p=1),
+            ToTensorV2(),
+        ]
+    )
+    test_transform = A.Compose(
+        [
+            A.Resize(input_size, input_size),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2(),
+        ]
+    )
+    
+    return train_transform, test_transform

@@ -46,6 +46,7 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument(
         "--n_patience", type=int, default=10, help="Number of patience epochs"
     )
+    parser.add_argument("--input_size", type=int, help="Image size", required=True)
     parser.add_argument("--model_name", type=str, help="Model name", choices=list(MODEL_REGISTRY.keys()))
     parser.add_argument(
         "--smp",
