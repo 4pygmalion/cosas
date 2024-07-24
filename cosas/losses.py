@@ -26,6 +26,31 @@ class DiceXentropy(torch.nn.Module):
         bce_loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, targets)
 
         return dice_loss + bce_loss
+
+class IoULoss(torch.nn.Module):
+    def __init__(self, smooth=1e-4):
+        super(IoULoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor):
+        logits = torch.sigmoid(logits)
+        intersection = (logits * targets).sum()
+        total = (logits + targets).sum()
+        union = total - intersection
+        iou_score = (intersection + self.smooth) / (union + self.smooth)
+        return 1 - iou_score
+    
+class DiceIoU(torch.nn.Module):
+    def __init__(self, smooth=1e-4):
+        super(DiceIoU, self).__init__()
+        self.dice = DiceLoss(smooth)
+        self.iou = IoULoss(smooth)
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor):
+        dice_loss = self.dice(logits, targets)
+        iou_loss = self.iou(logits, targets)
+
+        return dice_loss + iou_loss 
     
 class MCCLosswithLogits(torch.nn.Module):
     """
@@ -73,5 +98,6 @@ class MCCLosswithLogits(torch.nn.Module):
 LOSS_REGISTRY = {
     "dicebce": DiceXentropy,
     "dice": DiceLoss,
-    "mcc": MCCLosswithLogits
+    "mcc": MCCLosswithLogits,
+    "diceiou": DiceIoU,
 }
