@@ -9,6 +9,7 @@ progress
 torch
 torchvision
 torchaudio
+einops==0.3.0
 
 segmentation-models-pytorch
 albumentations 

@@ -1,5 +1,4 @@
 import argparse
-from io import BytesIO
 from typing import Tuple
 
 import random
@@ -11,6 +10,7 @@ from sklearn.model_selection import train_test_split
 
 from .data_model import COSASData, Scanncers
 from .transforms import remove_pad, reverse_tesellation
+from .networks import MODEL_REGISTRY
 
 
 class SetSMPArgs(argparse.Action):
@@ -44,7 +44,7 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument(
         "--n_patience", type=int, default=10, help="Number of patience epochs"
     )
-    parser.add_argument("--model_name", type=str, help="Model name")
+    parser.add_argument("--model_name", type=str, help="Model name", choices=list(MODEL_REGISTRY.keys()))
     parser.add_argument(
         "--smp",
         nargs="+",
