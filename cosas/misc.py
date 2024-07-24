@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 from .data_model import COSASData, Scanncers
 from .transforms import remove_pad, reverse_tesellation
 from .networks import MODEL_REGISTRY
+from .losses import LOSS_REGISTRY
 
 
 class SetSMPArgs(argparse.Action):
@@ -40,6 +41,7 @@ def get_config() -> argparse.ArgumentParser:
         choices=["patch", "image_mask", "whole", "pre_aug"],
         required=True,
     )
+    parser.add_argument("--loss", type=str, choices=list(LOSS_REGISTRY.keys()), required=True)
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument(
         "--n_patience", type=int, default=10, help="Number of patience epochs"

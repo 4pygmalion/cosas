@@ -15,7 +15,7 @@ from cosas.transforms import (
     find_representative_lab_image,
     get_lab_distribution,
 )
-from cosas.losses import DiceXentropy
+from cosas.losses import LOSS_REGISTRY
 from cosas.misc import set_seed, train_val_split, get_config
 from cosas.trainer import BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
@@ -78,10 +78,9 @@ if __name__ == "__main__":
     )
     test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
-    dice_bce_loss = DiceXentropy()
     trainer = BinaryClassifierTrainer(
         model=dp_model,
-        loss=dice_bce_loss,
+        loss=LOSS_REGISTRY[args.loss](),
         optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
         device=args.device,
     )
