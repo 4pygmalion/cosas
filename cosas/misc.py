@@ -96,22 +96,22 @@ def train_val_split(
         masks = scanner_data.masks
 
         # slide using random indices
-        train_val_images, test_images, train_val_masks, test_masks = train_test_split(
+        scan_train_val_images, scan_test_images, scan_train_val_masks, scan_test_masks = train_test_split(
             images, masks, test_size=test_size, random_state=random_seed
         )
-        train_images, val_images, train_masks, val_masks = train_test_split(
-            train_val_images,
-            train_val_masks,
+        scan_train_images, scan_val_images, scan_train_masks, scan_val_masks = train_test_split(
+            scan_train_val_images,
+            scan_train_val_masks,
             test_size=val_size,
             random_state=random_seed,
         )
 
-        train_images.extend(train_images)
-        train_masks.extend(train_masks)
-        val_images.extend(val_images)
-        val_masks.extend(val_masks)
-        test_images.extend(test_images)
-        test_masks.extend(test_masks)
+        train_images.extend(scan_train_images)
+        train_masks.extend(scan_train_masks)
+        val_images.extend(scan_val_images)
+        val_masks.extend(scan_val_masks)
+        test_images.extend(scan_test_images)
+        test_masks.extend(scan_test_masks)
 
     return (
         (train_images, train_masks),
