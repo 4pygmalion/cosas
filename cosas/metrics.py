@@ -160,7 +160,31 @@ def calculate_metrics(
 
 
 def summarize_metrics(metrics: List[Dict[str, float]]) -> Dict[str, float]:
+    """
+    Calculate the average value for each key in a list of dictionaries.
 
+    This function takes a list of dictionaries where each dictionary contains
+    metrics with float values. It calculates the average value for each key
+    across all dictionaries in the list.
+
+    Parameters:
+    metrics (List[Dict[str, float]]): A list of dictionaries, where each dictionary
+                                      contains metric names as keys and float values
+                                      as their corresponding values.
+
+    Returns:
+    Dict[str, float]: A dictionary containing the average value for each key
+                      across the input list of dictionaries.
+
+    Example:
+    >>> metrics = [
+    ...     {'accuracy': 0.8, 'precision': 0.75, 'recall': 0.7},
+    ...     {'accuracy': 0.82, 'precision': 0.78, 'recall': 0.72},
+    ...     {'accuracy': 0.81, 'precision': 0.76, 'recall': 0.74},
+    ... ]
+    >>> summarize_metrics(metrics)
+    {'accuracy': 0.81, 'precision': 0.7633333333333333, 'recall': 0.72}
+    """
     keys = metrics[0].keys()
     avg_metrics = {}
     for key in keys:
