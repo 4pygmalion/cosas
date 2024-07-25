@@ -157,3 +157,13 @@ def calculate_metrics(
         "iou": iou,
         "dice": dice,
     }
+
+
+def summarize_metrics(metrics: List[Dict[str, float]]) -> Dict[str, float]:
+
+    keys = metrics[0].keys()
+    avg_metrics = {}
+    for key in keys:
+        values = [metric[key] for metric in metrics]
+        avg_metrics[key] = sum(values) / len(values)
+    return avg_metrics
