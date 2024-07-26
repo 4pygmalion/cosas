@@ -213,6 +213,17 @@ def get_transforms(input_size):
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
+            A.OneOf(
+                [
+                    A.ColorJitter(
+                        brightness=(0.9, 1.1), 
+                        contrast=(0.9, 1.0), 
+                        hue=(-0.07, 0.07), 
+                        saturation=(0.9, 1.1)
+                    ),
+                    A.ToGray()
+                ]
+            ),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             CopyTransform(p=1),
             ToTensorV2(),
