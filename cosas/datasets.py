@@ -238,6 +238,25 @@ class PreAugDataset(Dataset):
             return image, mask
 
 
+class SupConDataset(Dataset):
+    def __init__(
+        self, images, masks, transform: A.Compose | None = None, device="cuda"
+    ):
+        self.images = images
+        self.masks = masks
+        self.transform = transform
+        self.device = device
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        # image classification
+        self.transform(image=self.images[idx], mask=self.masks[idx])
+
+        return
+
+
 DATASET_REGISTRY = {
     "patch": Patchdataset,
     "whole": WholeSizeDataset,
