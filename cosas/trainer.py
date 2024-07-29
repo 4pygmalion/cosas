@@ -323,8 +323,6 @@ class SSLTrainer(ABC):
         dataloader: torch.utils.data.DataLoader,
         epoch: int,
         phase: Literal["train", "val", "test"],
-        threshold: float = 0.5,
-        save_plot: bool = False,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.
@@ -369,7 +367,7 @@ class SSLTrainer(ABC):
             if phase == "train":
                 features = self.model(xs)
                 *_, ndim = features.shape
-                features = features.view(-1, n_views, ndim)
+                features = features.view(batch_size, n_views, ndim)
                 loss = self.loss(features, ys.float())
 
                 self.optimizer.zero_grad()
@@ -381,7 +379,7 @@ class SSLTrainer(ABC):
                 with torch.no_grad():
                     features = self.model(xs)
                     *_, ndim = features.shape
-                    features = features.view(-1, n_views, ndim)
+                    features = features.view(batch_size, n_views, ndim)
                     loss = self.loss(features, ys.float())
 
             # metric

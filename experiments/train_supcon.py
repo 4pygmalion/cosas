@@ -51,7 +51,7 @@ def get_config() -> argparse.ArgumentParser:
 def get_encoder_transforms(input_size):
     train_transform = A.Compose(
         [
-            A.Resize(input_size, input_size),
+            A.RandomCrop(input_size, input_size),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
@@ -73,7 +73,7 @@ def get_encoder_transforms(input_size):
     )
     test_transform = A.Compose(
         [
-            A.Resize(input_size, input_size),
+            A.RandomCrop(input_size, input_size),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
@@ -83,12 +83,13 @@ def get_encoder_transforms(input_size):
 
 
 class CustomEncoder(torch.nn.Module):
-    def __init__(self, encoder, ndim=1024):
+    def __init__(self, encoder, hidden_dim=384, ndim=1024):
         super().__init__()
         self.encoder = encoder
         self.avgpool = torch.nn.AvgPool2d(7)
         self.ndim = ndim
-        self.head = torch.nn.Linear(384, ndim)
+        self.hidden_dim = hidden_dim
+        self.head = torch.nn.Linear(hidden_dim, ndim)
 
     def forward(self, x):
         x = self.encoder(x)[-1]

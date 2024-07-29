@@ -240,17 +240,24 @@ class PreAugDataset(Dataset):
 
 class SupConDataset(Dataset):
     def __init__(
-        self, images, masks, transform: A.Compose, threshold=0.01, device="cuda"
+        self,
+        images,
+        masks,
+        transform: A.Compose,
+        threshold=0.01,
+        device="cuda",
+        image_size=(386, 386),
     ):
         self.images = images
         self.masks = masks
         self.transform = transform
         self.threshold = threshold
         self.device = device
+        self.image_size = image_size
         self._preaug()
 
     def _preaug(self, n=16):
-        self.crop = A.RandomCrop(360, 360, p=1)
+        self.crop = A.RandomCrop(*self.image_size, p=1)
 
         images = list()
         masks = list()
