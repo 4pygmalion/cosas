@@ -206,6 +206,7 @@ class CopyTransform(A.DualTransform):
     def get_transform_init_args_names(self):
         return ()
 
+
 def get_transforms(input_size):
     train_transform = A.Compose(
         [
@@ -216,12 +217,12 @@ def get_transforms(input_size):
             A.OneOf(
                 [
                     A.ColorJitter(
-                        brightness=(0.9, 1.1), 
-                        contrast=(0.9, 1.0), 
-                        hue=(-0.07, 0.07), 
-                        saturation=(0.9, 1.1)
+                        brightness=(0.9, 1.1),
+                        contrast=(0.9, 1.0),
+                        hue=(-0.07, 0.07),
+                        saturation=(0.9, 1.1),
                     ),
-                    A.ToGray()
+                    A.ToGray(),
                 ]
             ),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
@@ -236,5 +237,5 @@ def get_transforms(input_size):
             ToTensorV2(),
         ]
     )
-    
+
     return train_transform, test_transform
