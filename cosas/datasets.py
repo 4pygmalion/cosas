@@ -239,10 +239,12 @@ class PreAugDataset(Dataset):
 
 
 class SupConDataset(Dataset):
+    """DataSet for Supervised contrastive learing"""
+
     def __init__(
         self,
-        images,
-        masks,
+        images: List[np.ndarray],
+        masks: List[np.ndarray],
         transform: A.Compose,
         threshold=0.01,
         device="cuda",
@@ -256,7 +258,7 @@ class SupConDataset(Dataset):
         self.image_size = image_size
         self._preaug()
 
-    def _preaug(self, n=16):
+    def _preaug(self, n=32):
         self.crop = A.RandomCrop(*self.image_size, p=1)
 
         images = list()
@@ -276,12 +278,10 @@ class SupConDataset(Dataset):
         return len(self.images)
 
     def annotate_weakly_label(self, mask: np.ndarray) -> bool:
-
+        """Segmentation label -> Image level label"""
         n_pixels: int = np.prod(mask.shape)
         n_positive: int = np.sum(mask)
-
         positive_ratio = n_positive / n_pixels
-
         return positive_ratio >= self.threshold
 
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -303,4 +303,5 @@ DATASET_REGISTRY = {
     "whole": WholeSizeDataset,
     "image_mask": ImageMaskDataset,
     "pre_aug": PreAugDataset,
+    "supercon": SupConDataset,
 }
