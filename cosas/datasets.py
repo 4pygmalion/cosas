@@ -240,21 +240,38 @@ class PreAugDataset(Dataset):
 
 class SupConDataset(Dataset):
     def __init__(
-        self, images, masks, transform: A.Compose | None = None, device="cuda"
+        self, images, masks, transform: A.Compose, threshold=0.01, device="cuda"
     ):
         self.images = images
         self.masks = masks
+        self.crop = A.RandomCrop(224, 224, p=1)
         self.transform = transform
+        self.threshold = threshold
         self.device = device
 
     def __len__(self):
         return len(self.images)
 
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
-        # image classification
-        self.transform(image=self.images[idx], mask=self.masks[idx])
+    def annotate_weakly_label(self, image: np.ndarray, mask: np.ndarray) -> bool:
 
-        return
+        n_pixels: int = np.prod(image.shape)
+        n_positive: int = np.sum(mask)
+
+        positive_ratio = n_positive / n_pixels
+
+        return positive_ratio >= self.threshold
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        """한 뷰에서는 동일한 라벨이어야함."""
+
+        crop_image = self.crop(image=self.images[idx], mask=self.masks[idx])
+        aug1 = self.transform(image=crop_image["image"], mask=crop_image["mask"])
+        aug2 = self.transform(image=crop_image["image"], mask=crop_image["mask"])
+        views = torch.stack([aug1["image"], aug2["image"]], dim=0)
+
+        label = self.annotate_weakly_label(crop_image["image"], crop_image["mask"])
+
+        return views, torch.tensor([label], dtype=torch.float32)
 
 
 DATASET_REGISTRY = {
