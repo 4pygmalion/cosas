@@ -98,6 +98,11 @@ class CustomEncoder(torch.nn.Module):
         return torch.nn.functional.normalize(features, dim=1)
 
 
+n_hiddens = {
+    "efficientnet-b7": 640,
+}
+
+
 def main(args):
     cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
     cosas_data.load()
@@ -122,25 +127,15 @@ def main(args):
                 train_val_images, train_val_masks, test_size=0.2, random_state=args.seed
             )
 
-            train_transform, test_transform = get_encoder_transforms(args.input_size)
-            train_dataset = SupConDataset(
-                train_images, train_masks, train_transform, device=args.device
-            )
-            train_dataloader = DataLoader(
-                train_dataset, batch_size=args.batch_size, shuffle=True
-            )
-            val_dataset = SupConDataset(
-                val_images, val_masks, test_transform, device=args.device
-            )
-            val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
-
             model = smp.FPN(
                 encoder_name=args.model_name,
                 encoder_weights="imagenet",
                 in_channels=3,
                 classes=1,
             ).to(args.device)
-            encoder = CustomEncoder(model.encoder).to(args.device)
+            encoder = CustomEncoder(
+                model.encoder, hidden_dim=n_hiddens[args.model_name]
+            ).to(args.device)
             dp_model = torch.nn.DataParallel(encoder)
 
             trainer = SSLTrainer(
@@ -158,6 +153,20 @@ def main(args):
                 mlflow.log_params(args.__dict__)
                 mlflow.log_artifact(os.path.abspath(__file__))
                 mlflow.log_artifact(os.path.join(ROOT_DIR, "cosas", "networks.py"))
+
+                train_transform, test_transform = get_encoder_transforms(
+                    args.input_size
+                )
+                train_dataset = SupConDataset(
+                    train_images, train_masks, train_transform, device=args.device
+                )
+                train_dataloader = DataLoader(
+                    train_dataset, batch_size=args.batch_size, shuffle=True
+                )
+                val_dataset = SupConDataset(
+                    val_images, val_masks, test_transform, device=args.device
+                )
+                val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
 
                 trainer.train(
                     train_dataloader,
