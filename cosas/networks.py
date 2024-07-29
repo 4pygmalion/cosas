@@ -12,22 +12,22 @@ class PyramidSeg(torch.nn.Module):
         super(PyramidSeg, self).__init__()  # 부모 클래스 초기화
         self.level1_size = (224 * 3, 224 * 3)
         self.level2_size = (224, 224)
-        # self.level0 = smp.FPN(
-        #     encoder_name="efficientnet-b7",
-        #     encoder_weights="imagenet",
-        #     classes=2,
-        # )
-        # self.level0.encoder._conv_stem = Conv2dStaticSamePadding(
-        #     3, 64, kernel_size=(3, 3), stride=(2, 2), bias=False, image_size=224
-        # )
+        self.level0 = smp.FPN(
+            encoder_name="efficientnet-b7",
+            encoder_weights="imagenet",
+            classes=2,
+        )
+        self.level0.encoder._conv_stem = Conv2dStaticSamePadding(
+            3, 64, kernel_size=(3, 3), stride=(2, 2), bias=False, image_size=224
+        )
         self.level1 = smp.FPN(
             encoder_name="efficientnet-b7",
             encoder_weights="imagenet",
             classes=2,
         )
-        # self.level1.encoder._conv_stem = Conv2dStaticSamePadding(
-        #     5, 64, kernel_size=(3, 3), stride=(2, 2), bias=False, image_size=224
-        # )
+        self.level1.encoder._conv_stem = Conv2dStaticSamePadding(
+            5, 64, kernel_size=(3, 3), stride=(2, 2), bias=False, image_size=224
+        )
         self.level2 = smp.FPN(
             encoder_name="efficientnet-b7",
             encoder_weights="imagenet",
@@ -47,17 +47,17 @@ class PyramidSeg(torch.nn.Module):
         res = list()
         for x in xs:
             patched_x = tesellation(x.unsqueeze(0)).squeeze(0)
-            # level0_output = self.level0(patched_x)
-            # level0_output = reverse_tesellation(
-            #     level0_output, original_shape, device=self.device
-            # )
-            # level0_fusion = torch.concat(
-            #     [x.unsqueeze(0), level0_output.unsqueeze(0)], axis=1
-            # )
+            level0_output = self.level0(patched_x)
+            level0_output = reverse_tesellation(
+                level0_output, original_shape, device=self.device
+            )
+            level0_fusion = torch.concat(
+                [x.unsqueeze(0), level0_output.unsqueeze(0)], axis=1
+            )
 
-            # downsampled_o = Resize(self.level1_size)(level0_fusion)
-            # level1_inputs = tesellation(downsampled_o)  # (1, N, C, 224*3, 224*3)
-            level1_output = self.level1(patched_x.squeeze(0))
+            downsampled_o = Resize(self.level1_size)(level0_fusion)
+            level1_inputs = tesellation(downsampled_o)  # (1, N, C, 224*3, 224*3)
+            level1_output = self.level1(level1_inputs.squeeze(0))
             level1_output = reverse_tesellation(
                 level1_output, self.level1_size, device=self.device
             )
