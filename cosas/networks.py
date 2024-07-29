@@ -12,22 +12,22 @@ class PyramidSeg(torch.nn.Module):
         super(PyramidSeg, self).__init__()  # 부모 클래스 초기화
         self.level1_size = (224 * 3, 224 * 3)
         self.level2_size = (224, 224)
-        self.level0 = smp.FPN(
-            encoder_name="efficientnet-b7",
-            encoder_weights="imagenet",
-            classes=2,
-        )
-        self.level0.encoder._conv_stem = Conv2dStaticSamePadding(
-            3, 64, kernel_size=(3, 3), stride=(2, 2), bias=False, image_size=224
-        )
+        # self.level0 = smp.FPN(
+        #     encoder_name="efficientnet-b7",
+        #     encoder_weights="imagenet",
+        #     classes=2,
+        # )
+        # self.level0.encoder._conv_stem = Conv2dStaticSamePadding(
+        #     3, 64, kernel_size=(3, 3), stride=(2, 2), bias=False, image_size=224
+        # )
         self.level1 = smp.FPN(
             encoder_name="efficientnet-b7",
             encoder_weights="imagenet",
             classes=2,
         )
-        self.level1.encoder._conv_stem = Conv2dStaticSamePadding(
-            5, 64, kernel_size=(3, 3), stride=(2, 2), bias=False, image_size=224
-        )
+        # self.level1.encoder._conv_stem = Conv2dStaticSamePadding(
+        #     5, 64, kernel_size=(3, 3), stride=(2, 2), bias=False, image_size=224
+        # )
         self.level2 = smp.FPN(
             encoder_name="efficientnet-b7",
             encoder_weights="imagenet",
@@ -47,17 +47,17 @@ class PyramidSeg(torch.nn.Module):
         res = list()
         for x in xs:
             patched_x = tesellation(x.unsqueeze(0)).squeeze(0)
-            level0_output = self.level0(patched_x)
-            level0_output = reverse_tesellation(
-                level0_output, original_shape, device=self.device
-            )
-            level0_fusion = torch.concat(
-                [x.unsqueeze(0), level0_output.unsqueeze(0)], axis=1
-            )
+            # level0_output = self.level0(patched_x)
+            # level0_output = reverse_tesellation(
+            #     level0_output, original_shape, device=self.device
+            # )
+            # level0_fusion = torch.concat(
+            #     [x.unsqueeze(0), level0_output.unsqueeze(0)], axis=1
+            # )
 
-            downsampled_o = Resize(self.level1_size)(level0_fusion)
-            level1_inputs = tesellation(downsampled_o)  # (1, N, C, 224*3, 224*3)
-            level1_output = self.level1(level1_inputs.squeeze(0))
+            # downsampled_o = Resize(self.level1_size)(level0_fusion)
+            # level1_inputs = tesellation(downsampled_o)  # (1, N, C, 224*3, 224*3)
+            level1_output = self.level1(patched_x.squeeze(0))
             level1_output = reverse_tesellation(
                 level1_output, self.level1_size, device=self.device
             )
@@ -74,8 +74,6 @@ class PyramidSeg(torch.nn.Module):
         return Resize(original_shape)(res)
 
 
-
-
 class MultiHeadAttention(nn.Module):
     def __init__(self, embedding_dim, head_num):
         super().__init__()
@@ -89,7 +87,9 @@ class MultiHeadAttention(nn.Module):
     def forward(self, x, mask=None):
         qkv = self.qkv_layer(x)
 
-        query, key, value = tuple(rearrange(qkv, 'b t (d k h ) -> k b h t d ', k=3, h=self.head_num))
+        query, key, value = tuple(
+            rearrange(qkv, "b t (d k h ) -> k b h t d ", k=3, h=self.head_num)
+        )
         energy = torch.einsum("... i d , ... j d -> ... i j", query, key) * self.dk
 
         if mask is not None:
@@ -114,7 +114,7 @@ class MLP(nn.Module):
             nn.GELU(),
             nn.Dropout(0.1),
             nn.Linear(mlp_dim, embedding_dim),
-            nn.Dropout(0.1)
+            nn.Dropout(0.1),
         )
 
     def forward(self, x):
@@ -153,22 +153,38 @@ class TransformerEncoder(nn.Module):
         super().__init__()
 
         self.layer_blocks = nn.ModuleList(
-            [TransformerEncoderBlock(embedding_dim, head_num, mlp_dim) for _ in range(block_num)])
+            [
+                TransformerEncoderBlock(embedding_dim, head_num, mlp_dim)
+                for _ in range(block_num)
+            ]
+        )
 
     def forward(self, x):
         for layer_block in self.layer_blocks:
             x = layer_block(x)
 
         return x
+
+
 class ViT(nn.Module):
-    def __init__(self, img_dim, in_channels, embedding_dim, head_num, mlp_dim,
-                 block_num, patch_dim, classification=True, num_classes=1):
+    def __init__(
+        self,
+        img_dim,
+        in_channels,
+        embedding_dim,
+        head_num,
+        mlp_dim,
+        block_num,
+        patch_dim,
+        classification=True,
+        num_classes=1,
+    ):
         super().__init__()
 
         self.patch_dim = patch_dim
         self.classification = classification
         self.num_tokens = (img_dim // patch_dim) ** 2
-        self.token_dim = in_channels * (patch_dim ** 2)
+        self.token_dim = in_channels * (patch_dim**2)
 
         self.projection = nn.Linear(self.token_dim, embedding_dim)
         self.embedding = nn.Parameter(torch.rand(self.num_tokens + 1, embedding_dim))
@@ -177,24 +193,30 @@ class ViT(nn.Module):
 
         self.dropout = nn.Dropout(0.1)
 
-        self.transformer = TransformerEncoder(embedding_dim, head_num, mlp_dim, block_num)
+        self.transformer = TransformerEncoder(
+            embedding_dim, head_num, mlp_dim, block_num
+        )
 
         if self.classification:
             self.mlp_head = nn.Linear(embedding_dim, num_classes)
 
     def forward(self, x):
-        img_patches = rearrange(x,
-                                'b c (patch_x x) (patch_y y) -> b (x y) (patch_x patch_y c)',
-                                patch_x=self.patch_dim, patch_y=self.patch_dim)
+        img_patches = rearrange(
+            x,
+            "b c (patch_x x) (patch_y y) -> b (x y) (patch_x patch_y c)",
+            patch_x=self.patch_dim,
+            patch_y=self.patch_dim,
+        )
 
         batch_size, tokens, _ = img_patches.shape
 
         project = self.projection(img_patches)
-        token = repeat(self.cls_token, 'b ... -> (b batch_size) ...',
-                       batch_size=batch_size)
+        token = repeat(
+            self.cls_token, "b ... -> (b batch_size) ...", batch_size=batch_size
+        )
 
         patches = torch.cat([token, project], dim=1)
-        patches += self.embedding[:tokens + 1, :]
+        patches += self.embedding[: tokens + 1, :]
 
         x = self.dropout(patches)
         x = self.transformer(x)
@@ -208,8 +230,10 @@ class EncoderBottleneck(nn.Module):
         super().__init__()
 
         self.downsample = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
-            nn.BatchNorm2d(out_channels)
+            nn.Conv2d(
+                in_channels, out_channels, kernel_size=1, stride=stride, bias=False
+            ),
+            nn.BatchNorm2d(out_channels),
         )
 
         width = int(out_channels * (base_width / 64))
@@ -217,7 +241,16 @@ class EncoderBottleneck(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, width, kernel_size=1, stride=1, bias=False)
         self.norm1 = nn.BatchNorm2d(width)
 
-        self.conv2 = nn.Conv2d(width, width, kernel_size=3, stride=2, groups=1, padding=1, dilation=1, bias=False)
+        self.conv2 = nn.Conv2d(
+            width,
+            width,
+            kernel_size=3,
+            stride=2,
+            groups=1,
+            padding=1,
+            dilation=1,
+            bias=False,
+        )
         self.norm2 = nn.BatchNorm2d(width)
 
         self.conv3 = nn.Conv2d(width, out_channels, kernel_size=1, stride=1, bias=False)
@@ -248,14 +281,16 @@ class DecoderBottleneck(nn.Module):
     def __init__(self, in_channels, out_channels, scale_factor=2):
         super().__init__()
 
-        self.upsample = nn.Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=True)
+        self.upsample = nn.Upsample(
+            scale_factor=scale_factor, mode="bilinear", align_corners=True
+        )
         self.layer = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         )
 
     def forward(self, x, x_concat=None):
@@ -269,10 +304,21 @@ class DecoderBottleneck(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, img_dim, in_channels, out_channels, head_num, mlp_dim, block_num, patch_dim):
+    def __init__(
+        self,
+        img_dim,
+        in_channels,
+        out_channels,
+        head_num,
+        mlp_dim,
+        block_num,
+        patch_dim,
+    ):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(
+            in_channels, out_channels, kernel_size=7, stride=2, padding=3, bias=False
+        )
         self.norm1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
@@ -281,10 +327,20 @@ class Encoder(nn.Module):
         self.encoder3 = EncoderBottleneck(out_channels * 4, out_channels * 8, stride=2)
 
         self.vit_img_dim = img_dim // patch_dim
-        self.vit = ViT(self.vit_img_dim, out_channels * 8, out_channels * 8,
-                       head_num, mlp_dim, block_num, patch_dim=1, classification=False)
+        self.vit = ViT(
+            self.vit_img_dim,
+            out_channels * 8,
+            out_channels * 8,
+            head_num,
+            mlp_dim,
+            block_num,
+            patch_dim=1,
+            classification=False,
+        )
 
-        self.conv2 = nn.Conv2d(out_channels * 8, 512, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(
+            out_channels * 8, 512, kernel_size=3, stride=1, padding=1
+        )
         self.norm2 = nn.BatchNorm2d(512)
 
     def forward(self, x):
@@ -313,7 +369,9 @@ class Decoder(nn.Module):
         self.decoder1 = DecoderBottleneck(out_channels * 8, out_channels * 2)
         self.decoder2 = DecoderBottleneck(out_channels * 4, out_channels)
         self.decoder3 = DecoderBottleneck(out_channels * 2, int(out_channels * 1 / 2))
-        self.decoder4 = DecoderBottleneck(int(out_channels * 1 / 2), int(out_channels * 1 / 8))
+        self.decoder4 = DecoderBottleneck(
+            int(out_channels * 1 / 2), int(out_channels * 1 / 8)
+        )
 
         self.conv1 = nn.Conv2d(int(out_channels * 1 / 8), class_num, kernel_size=1)
 
@@ -329,16 +387,28 @@ class Decoder(nn.Module):
 
 class TransUNet(nn.Module):
     """
-    
+
     Source:
         https://github.com/mkara44/transunet_pytorch/blob/main/utils/transunet.py
-    
+
     """
-    def __init__(self, img_dim=1024, in_channels=3, out_channels=128, head_num=4, mlp_dim=512, block_num=8, patch_dim=16, class_num=1):
+
+    def __init__(
+        self,
+        img_dim=1024,
+        in_channels=3,
+        out_channels=128,
+        head_num=4,
+        mlp_dim=512,
+        block_num=8,
+        patch_dim=16,
+        class_num=1,
+    ):
         super().__init__()
 
-        self.encoder = Encoder(img_dim, in_channels, out_channels,
-                               head_num, mlp_dim, block_num, patch_dim)
+        self.encoder = Encoder(
+            img_dim, in_channels, out_channels, head_num, mlp_dim, block_num, patch_dim
+        )
 
         self.decoder = Decoder(out_channels, class_num)
 
@@ -348,7 +418,5 @@ class TransUNet(nn.Module):
 
         return x
 
-MODEL_REGISTRY = {
-    "pyramid": PyramidSeg,
-    "transunet": TransUNet
-}
+
+MODEL_REGISTRY = {"pyramid": PyramidSeg, "transunet": TransUNet}

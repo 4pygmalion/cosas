@@ -151,7 +151,7 @@ class SupConLoss(nn.Module):
             mask = mask.float().to(device)
 
         contrast_count = features.shape[1]
-        contrast_feature = torch.cat(torch.unbind(features, dim=1), dim=0)
+        contrast_feature = torch.cat(torch.unbind(features, dim=1), dim=0)  # (2N, D)
         if self.contrast_mode == "one":
             anchor_feature = features[:, 0]
             anchor_count = 1
@@ -161,10 +161,11 @@ class SupConLoss(nn.Module):
         else:
             raise ValueError("Unknown mode: {}".format(self.contrast_mode))
 
-        # compute logits
+        # 분모(z_i, z_a)
         anchor_dot_contrast = torch.div(
             torch.matmul(anchor_feature, contrast_feature.T), self.temperature
         )
+
         # for numerical stability
         logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
         logits = anchor_dot_contrast - logits_max.detach()
@@ -195,7 +196,6 @@ class SupConLoss(nn.Module):
         mask_pos_pairs = torch.where(mask_pos_pairs < 1e-6, 1, mask_pos_pairs)
         mean_log_prob_pos = (mask * log_prob).sum(1) / mask_pos_pairs
 
-        print(mean_log_prob_pos)
         # loss
         loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
         loss = loss.view(anchor_count, batch_size).mean()

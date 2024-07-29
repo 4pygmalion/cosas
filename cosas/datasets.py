@@ -244,17 +244,33 @@ class SupConDataset(Dataset):
     ):
         self.images = images
         self.masks = masks
-        self.crop = A.RandomCrop(224, 224, p=1)
         self.transform = transform
         self.threshold = threshold
         self.device = device
+        self._preaug()
+
+    def _preaug(self, n=16):
+        self.crop = A.RandomCrop(360, 360, p=1)
+
+        images = list()
+        masks = list()
+        for iter in tqdm.tqdm(range(n), desc="Pre-augmentation"):
+            for image, mask in zip(self.images, self.masks):
+                aug = self.crop(image=image, mask=mask)
+                images.append(aug["image"])
+                masks.append(aug["mask"])
+
+        self.images = images
+        self.masks = masks
+
+        return
 
     def __len__(self):
         return len(self.images)
 
-    def annotate_weakly_label(self, image: np.ndarray, mask: np.ndarray) -> bool:
+    def annotate_weakly_label(self, mask: np.ndarray) -> bool:
 
-        n_pixels: int = np.prod(image.shape)
+        n_pixels: int = np.prod(mask.shape)
         n_positive: int = np.sum(mask)
 
         positive_ratio = n_positive / n_pixels
@@ -264,12 +280,13 @@ class SupConDataset(Dataset):
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
         """한 뷰에서는 동일한 라벨이어야함."""
 
-        crop_image = self.crop(image=self.images[idx], mask=self.masks[idx])
-        aug1 = self.transform(image=crop_image["image"], mask=crop_image["mask"])
-        aug2 = self.transform(image=crop_image["image"], mask=crop_image["mask"])
+        image = self.images[idx]
+        mask = self.masks[idx]
+        aug1 = self.transform(image=image, mask=mask)
+        aug2 = self.transform(image=image, mask=mask)
         views = torch.stack([aug1["image"], aug2["image"]], dim=0)
 
-        label = self.annotate_weakly_label(crop_image["image"], crop_image["mask"])
+        label = self.annotate_weakly_label(mask)
 
         return views, torch.tensor([label], dtype=torch.float32)
 
