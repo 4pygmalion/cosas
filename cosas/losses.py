@@ -205,9 +205,23 @@ class SupConLoss(nn.Module):
         return loss
 
 
+class AELoss(torch.nn.Module):
+    def __init__(self):
+        super(AELoss, self).__init__()
+
+    def forward(self, recon_x, x, logits, targets):
+        mask_error = torch.nn.functional.binary_cross_entropy_with_logits(
+            logits, targets
+        )
+        recon_error = torch.nn.functional.mse_loss(recon_x, x)
+
+        return mask_error + recon_error
+
+
 LOSS_REGISTRY = {
     "dicebce": DiceXentropy,
     "dice": DiceLoss,
     "mcc": MCCLosswithLogits,
     "diceiou": DiceIoU,
+    "multi-task": AELoss,
 }
