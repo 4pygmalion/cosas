@@ -55,13 +55,6 @@ if __name__ == "__main__":
     else:
         from cosas.networks import MODEL_REGISTRY
 
-        # TODO
-        if args.model_name == "transunet":
-            model = MODEL_REGISTRY[args.model_name](args.input_size).to(args.device)
-        else:
-            model = MODEL_REGISTRY[args.model_name]().to(args.device)
-    dp_model = torch.nn.DataParallel(model)
-
     cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
     cosas_data.load()
 
@@ -114,6 +107,12 @@ if __name__ == "__main__":
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
+            # TODO
+            if args.model_name == "transunet":
+                model = MODEL_REGISTRY[args.model_name](args.input_size).to(args.device)
+            else:
+                model = MODEL_REGISTRY[args.model_name]().to(args.device)
+            dp_model = torch.nn.DataParallel(model)
             trainer = BinaryClassifierTrainer(
                 model=dp_model,
                 loss=LOSS_REGISTRY[args.loss](),

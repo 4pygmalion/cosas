@@ -120,7 +120,7 @@ def main(args):
     summary_metrics = list()
     with mlflow.start_run(
         experiment_id=experiment.experiment_id, run_name=args.run_name
-    ) as run:
+    ):
 
         folds = KFold(n_splits=5, shuffle=True, random_state=42)
         for fold, (train_val_indices, test_indices) in enumerate(
