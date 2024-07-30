@@ -1,3 +1,12 @@
+"""Supervised Constrative learning
+
+python3 experiments/train_supcon.py \
+    --run_name supcon_test \
+    --batch_size 512 \
+    --input_size 240 \
+    --model_name efficientnet-b1
+"""
+
 import os
 import argparse
 
@@ -34,7 +43,7 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser.add_argument("--run_name", type=str, default="SuperCon", help="Run name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
+    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     parser.add_argument("--loss", type=str, default="SuperCon")
@@ -98,9 +107,7 @@ class CustomEncoder(torch.nn.Module):
         return torch.nn.functional.normalize(features, dim=1)
 
 
-n_hiddens = {
-    "efficientnet-b7": 640,
-}
+n_hiddens = {"efficientnet-b7": 640, "efficientnet-b3": 384, "efficientnet-b1": 320}
 
 
 def main(args):
@@ -138,13 +145,6 @@ def main(args):
             ).to(args.device)
             dp_model = torch.nn.DataParallel(encoder)
 
-            trainer = SSLTrainer(
-                model=dp_model,
-                loss=SupConLoss(),
-                optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
-                device=args.device,
-            )
-
             with mlflow.start_run(
                 experiment_id=experiment.experiment_id,
                 run_name=args.run_name + f"_Upstream{fold}",
@@ -163,17 +163,14 @@ def main(args):
                 train_dataloader = DataLoader(
                     train_dataset, batch_size=args.batch_size, shuffle=True
                 )
-                val_dataset = SupConDataset(
-                    val_images, val_masks, test_transform, device=args.device
-                )
-                val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
 
-                trainer.train(
-                    train_dataloader,
-                    val_dataloader,
-                    epochs=args.epochs,
-                    n_patience=args.n_patience,
+                trainer = SSLTrainer(
+                    model=dp_model,
+                    loss=SupConLoss(),
+                    optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+                    device=args.device,
                 )
+                trainer.train(train_dataloader, epochs=args.epochs)
                 mlflow.pytorch.log_model(encoder, "model")
                 for param in encoder.parameters():
                     param.requires_grad = False
