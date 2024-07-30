@@ -10,9 +10,9 @@ from torch.utils.data import DataLoader
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
+from cosas.networks import MultiTaskAE
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
-from cosas.networks import MODEL_REGISTRY
 from cosas.transforms import CopyTransform
 from cosas.losses import LOSS_REGISTRY
 from cosas.misc import set_seed, get_config
@@ -52,6 +52,7 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model_name", type=str, help="Model name", default="autoencoder"
     )
+    parser.add_argument("--encoder_name", type=str, required=True)
 
     return parser.parse_args()
 
@@ -128,7 +129,7 @@ if __name__ == "__main__":
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
-            model = MODEL_REGISTRY[args.model_name]().to(args.device)
+            model = MultiTaskAE(args.encoder_name, args.input_size).to(args.device)
 
             dp_model = torch.nn.DataParallel(model)
             trainer = AETrainer(

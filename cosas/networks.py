@@ -423,10 +423,13 @@ class TransUNet(nn.Module):
 
 
 class MultiTaskAE(torch.nn.Module):
-    def __init__(self, input_size=(224, 224)):
+    def __init__(self, encoder_name, input_size=(224, 224)):
         super(MultiTaskAE, self).__init__()
 
-        self.unet = smp.Unet(classes=6)
+        self.encoder_name = encoder_name
+        self.input_size = input_size
+
+        self.unet = smp.Unet(encoder_name=self.encoder_name, classes=6)
         self.encoder = self.unet.encoder
         self.stain_app = UnetDecoder(
             encoder_channels=self.encoder.out_channels,
@@ -435,7 +438,6 @@ class MultiTaskAE(torch.nn.Module):
         self.mask_head = SegmentationHead(
             in_channels=8, out_channels=1, activation=None
         )
-        self.input_size = input_size
 
     def reconstruction(self, x):
         z = self.unet.encoder(x)
