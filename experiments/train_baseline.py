@@ -108,10 +108,12 @@ if __name__ == "__main__":
             else:
                 from cosas.networks import MODEL_REGISTRY
 
-            if args.model_name == "transunet":
-                model = MODEL_REGISTRY[args.model_name](args.input_size).to(args.device)
-            else:
-                model = MODEL_REGISTRY[args.model_name]().to(args.device)
+                if args.model_name == "transunet":
+                    model = MODEL_REGISTRY[args.model_name](args.input_size).to(
+                        args.device
+                    )
+                else:
+                    model = MODEL_REGISTRY[args.model_name]().to(args.device)
 
             dp_model = torch.nn.DataParallel(model)
             trainer = BinaryClassifierTrainer(
