@@ -45,16 +45,6 @@ if __name__ == "__main__":
     args = get_config()
     set_seed(42)
 
-    if args.smp:
-        model = smp.FPN(
-            encoder_name=args.encoder_name,
-            encoder_weights=args.encoder_weights,
-            classes=1,
-            activation=None,
-        ).to(args.device)
-    else:
-        from cosas.networks import MODEL_REGISTRY
-
     cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
     cosas_data.load()
 
@@ -108,10 +98,21 @@ if __name__ == "__main__":
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
             # TODO
+            if args.smp:
+                model = smp.FPN(
+                    encoder_name=args.encoder_name,
+                    encoder_weights=args.encoder_weights,
+                    classes=1,
+                    activation=None,
+                ).to(args.device)
+            else:
+                from cosas.networks import MODEL_REGISTRY
+
             if args.model_name == "transunet":
                 model = MODEL_REGISTRY[args.model_name](args.input_size).to(args.device)
             else:
                 model = MODEL_REGISTRY[args.model_name]().to(args.device)
+
             dp_model = torch.nn.DataParallel(model)
             trainer = BinaryClassifierTrainer(
                 model=dp_model,
