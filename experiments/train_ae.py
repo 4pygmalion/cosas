@@ -3,6 +3,8 @@ import argparse
 
 import mlflow
 import torch
+import albumentations as A
+from albumentations.pytorch.transforms import ToTensorV2
 from sklearn.model_selection import KFold, train_test_split
 from torch.utils.data import DataLoader
 
@@ -11,7 +13,7 @@ from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.networks import MODEL_REGISTRY
-from cosas.transforms import get_transforms
+from cosas.transforms import CopyTransform
 from cosas.losses import LOSS_REGISTRY
 from cosas.misc import set_seed, get_config
 from cosas.trainer import AETrainer
@@ -52,6 +54,29 @@ def get_config() -> argparse.ArgumentParser:
     )
 
     return parser.parse_args()
+
+
+def get_transforms(input_size):
+    train_transform = A.Compose(
+        [
+            A.Resize(input_size, input_size),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomRotate90(p=0.5),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            CopyTransform(p=1),
+            ToTensorV2(),
+        ]
+    )
+    test_transform = A.Compose(
+        [
+            A.Resize(input_size, input_size),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2(),
+        ]
+    )
+
+    return train_transform, test_transform
 
 
 if __name__ == "__main__":
