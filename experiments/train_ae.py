@@ -129,7 +129,9 @@ if __name__ == "__main__":
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
-            model = MultiTaskAE(args.encoder_name, args.input_size).to(args.device)
+            model = MultiTaskAE(
+                args.encoder_name, input_size=(args.input_size, args.input_size)
+            ).to(args.device)
 
             dp_model = torch.nn.DataParallel(model)
             trainer = AETrainer(
