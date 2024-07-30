@@ -1,25 +1,23 @@
 import pytest
-import torch
+import numpy as np
 from cosas.datasets import SupConDataset
 
 
 @pytest.mark.parametrize(
-    "image, mask, expected",
+    "mask, expected",
     [
         pytest.param(
-            torch.randn(3, 32, 32, dtype=torch.float32),
-            torch.zeros(3, 32, 32, dtype=torch.float32),
-            torch.tensor([0], dtype=torch.float32),
+            np.zeros((3, 32, 32), dtype=np.float32),
+            False,
         ),
         pytest.param(
-            torch.randn(3, 32, 32, dtype=torch.float32),
-            torch.ones(3, 32, 32, dtype=torch.float32),
-            torch.tensor([1], dtype=torch.float32),
+            np.ones((3, 32, 32), dtype=np.float32),
+            True,
         ),
     ],
 )
-def test_annotate_weakly_label(image, mask, expected):
+def test_annotate_weakly_label(mask, expected):
     transform = lambda x: x
     dataset = SupConDataset([], [], transform=transform)
 
-    assert expected == dataset.annotate_weakly_label(image, mask)
+    assert expected == dataset.annotate_weakly_label(mask)
