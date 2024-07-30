@@ -1,3 +1,12 @@
+"""Supervised Constrative learning
+
+python3 experiments/train_supcon.py \
+    --run_name supcon_test \
+    --batch_size 512 \
+    --input_size 240 \
+    --model_name efficientnet-b1
+"""
+
 import os
 import argparse
 
@@ -98,9 +107,7 @@ class CustomEncoder(torch.nn.Module):
         return torch.nn.functional.normalize(features, dim=1)
 
 
-n_hiddens = {
-    "efficientnet-b7": 640,
-}
+n_hiddens = {"efficientnet-b7": 640, "efficientnet-b3": 384, "efficientnet-b1": 320}
 
 
 def main(args):
@@ -156,10 +163,6 @@ def main(args):
                 train_dataloader = DataLoader(
                     train_dataset, batch_size=args.batch_size, shuffle=True
                 )
-                val_dataset = SupConDataset(
-                    val_images, val_masks, test_transform, device=args.device
-                )
-                val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
 
                 trainer = SSLTrainer(
                     model=dp_model,
@@ -167,12 +170,7 @@ def main(args):
                     optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
                     device=args.device,
                 )
-                trainer.train(
-                    train_dataloader,
-                    val_dataloader,
-                    epochs=args.epochs,
-                    n_patience=args.n_patience,
-                )
+                trainer.train(train_dataloader, epochs=args.epochs)
                 mlflow.pytorch.log_model(encoder, "model")
                 for param in encoder.parameters():
                     param.requires_grad = False
