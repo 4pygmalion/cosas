@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
-from einops import rearrange, repeat
 from torchvision.transforms import Resize
+from einops import rearrange, repeat
 from efficientnet_pytorch.utils import Conv2dStaticSamePadding
+from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
+from segmentation_models_pytorch.base.heads import SegmentationHead
+
 from cosas.transforms import tesellation, reverse_tesellation
 
 
@@ -419,4 +422,56 @@ class TransUNet(nn.Module):
         return x
 
 
-MODEL_REGISTRY = {"pyramid": PyramidSeg, "transunet": TransUNet}
+class MultiTaskAE(torch.nn.Module):
+    def __init__(self, input_size=(224, 224)):
+        super(MultiTaskAE, self).__init__()
+
+        self.unet = smp.Unet(classes=6)
+        self.encoder = self.unet.encoder
+        self.stain_app = UnetDecoder(
+            encoder_channels=self.encoder.out_channels,
+            decoder_channels=(256, 128, 64, 32, 2),
+        )
+        self.mask_head = SegmentationHead(
+            in_channels=8, out_channels=1, activation=None
+        )
+        self.input_size = input_size
+
+    def reconstruction(self, x):
+        z = self.unet.encoder(x)
+
+        # Stain vectors (B, 2, 3, W, H)
+        x = self.unet.decoder(*z)  # (6, W, H)
+        x = self.unet.segmentation_head(x)  # (B, 6, W, H)
+        stain_vectors = x.view(-1, 2, 3, *self.input_size)  # (B, 2, 3, W, H)
+
+        # Stain Density (B, 2, W, H)
+        stain_density = self.stain_app(*z)  # (B, 2, W, H)
+
+        recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
+        recon = torch.clip(recon, -1, 1)
+
+        return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
+
+    def forward(self, x):
+        w, h = x.shape[-2:]
+
+        output = self.reconstruction(x)
+        recon = output["recon"]
+        vector = output["vector"]
+        density = output["denisty"]
+
+        batch_size = x.shape[0]
+        stain_info = torch.concat(
+            [vector.view(batch_size, -1, w, h), density.view(batch_size, -1, w, h)],
+            axis=1,
+        )
+
+        return {"recon": recon, "mask": self.mask_head(stain_info)}
+
+
+MODEL_REGISTRY = {
+    "pyramid": PyramidSeg,
+    "transunet": TransUNet,
+    "autoencoder": MultiTaskAE,
+}

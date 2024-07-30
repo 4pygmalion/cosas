@@ -32,7 +32,7 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser.add_argument("--run_name", type=str, default="baseline", help="Run name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
+    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     parser.add_argument(
@@ -41,13 +41,17 @@ def get_config() -> argparse.ArgumentParser:
         choices=["patch", "image_mask", "whole", "pre_aug"],
         required=True,
     )
-    parser.add_argument("--loss", type=str, choices=list(LOSS_REGISTRY.keys()), required=True)
+    parser.add_argument(
+        "--loss", type=str, choices=list(LOSS_REGISTRY.keys()), required=True
+    )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument(
         "--n_patience", type=int, default=10, help="Number of patience epochs"
     )
     parser.add_argument("--input_size", type=int, help="Image size", required=True)
-    parser.add_argument("--model_name", type=str, help="Model name", choices=list(MODEL_REGISTRY.keys()))
+    parser.add_argument(
+        "--model_name", type=str, help="Model name", choices=list(MODEL_REGISTRY.keys())
+    )
     parser.add_argument(
         "--smp",
         nargs="+",
@@ -59,7 +63,6 @@ def get_config() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
-
     return parser.parse_args()
 
 
@@ -96,14 +99,21 @@ def train_val_split(
         masks = scanner_data.masks
 
         # slide using random indices
-        scan_train_val_images, scan_test_images, scan_train_val_masks, scan_test_masks = train_test_split(
+        (
+            scan_train_val_images,
+            scan_test_images,
+            scan_train_val_masks,
+            scan_test_masks,
+        ) = train_test_split(
             images, masks, test_size=test_size, random_state=random_seed
         )
-        scan_train_images, scan_val_images, scan_train_masks, scan_val_masks = train_test_split(
-            scan_train_val_images,
-            scan_train_val_masks,
-            test_size=val_size,
-            random_state=random_seed,
+        scan_train_images, scan_val_images, scan_train_masks, scan_val_masks = (
+            train_test_split(
+                scan_train_val_images,
+                scan_train_val_masks,
+                test_size=val_size,
+                random_state=random_seed,
+            )
         )
 
         train_images.extend(scan_train_images)

@@ -14,7 +14,6 @@ from sklearn.metrics import roc_auc_score
 
 from .tracking import plot_and_save, log_patch_and_save
 from .metrics import Metrics, AverageMeter, calculate_metrics
-from .datasets import WholeSizeDataset
 
 
 class BaseTrainer(ABC):
@@ -246,27 +245,6 @@ class BinaryClassifierTrainer(ABC):
         return train_loss, train_metrics, val_loss, val_metrics
 
 
-class BaseTrainer(ABC):
-    @abstractmethod
-    def make_bar_sentence(self):
-        pass
-
-    @abstractmethod
-    def run_epoch(self):
-        pass
-
-    def get_accuracy(
-        self, logit: torch.Tensor, labels: torch.Tensor, threshold: int = 0.5
-    ) -> float:
-        confidence = torch.sigmoid(logit).flatten()
-        pred_labels = (confidence > threshold).float().flatten()
-        return (pred_labels == labels).sum().item() / len(labels)
-
-    def get_auroc(self, logit: torch.Tensor, labels: torch.Tensor) -> float:
-        confidence = torch.sigmoid(logit).flatten()
-        return roc_auc_score(labels.flatten(), confidence)
-
-
 class SSLTrainer(ABC):
     def __init__(
         self,
@@ -414,3 +392,136 @@ class SSLTrainer(ABC):
         mlflow.pytorch.log_model(self.model, "encoder")
 
         return train_loss
+
+
+class AETrainer(BinaryClassifierTrainer):
+    def __init__(
+        self,
+        model: torch.nn.modules.Module,
+        loss: torch.nn.modules.loss._Loss,
+        device: str = "cuda",
+        optimizer: torch.optim.Optimizer = None,
+        logger: logging.Logger = None,
+    ):
+        self.model = model
+        self.loss = loss
+        self.optimizer = optimizer
+        self.device = device
+        self.logger = logging.Logger("AutoEncoderTrainer") if logger is None else logger
+
+    def run_epoch(
+        self,
+        dataloader: torch.utils.data.DataLoader,
+        epoch: int,
+        phase: Literal["train", "val", "test"],
+        threshold: float = 0.5,
+        save_plot: bool = False,
+    ) -> Tuple[AverageMeter, Metrics]:
+        """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
+        반환함.
+
+        Note:
+            - 1 epoch = Dataset의 전체를 학습한경우
+            - 1 step = epoch을 하기위해 더 작은 단위(batch)로 학습할 떄의 단위
+
+        Args:
+            phase (str): training or validation
+            epoch (int): epoch
+            dataloader (torch.utils.data.DataLoader): dataset (train or validation)
+
+        Returns:
+            Tuple: loss, accuracy, top_k_recall
+        """
+
+        # init
+        if phase == "train":
+            self.model.train()
+        else:
+            self.model.eval
+
+        total_step = len(dataloader)
+        bar = Bar(max=total_step, check_tty=False)
+
+        epoch_metrics = Metrics()
+        loss_meter = AverageMeter("loss")
+        scheduler = torch.optim.lr_scheduler.CyclicLR(
+            self.optimizer,
+            base_lr=0.001,
+            max_lr=0.1,
+            step_size_up=int(len(dataloader)) * 4,
+            step_size_down=int(len(dataloader)) * 4,
+        )
+        i = 0
+        for step, batch in enumerate(dataloader):
+            xs, ys = batch
+            xs = xs.to(self.device)
+            ys = ys.to(self.device)
+
+            if phase == "train":
+                outputs = self.model(xs)
+                recon_x = outputs["recon"]
+                logits = outputs["mask"]
+
+                logits = logits.view(ys.shape)
+                loss = self.loss(recon_x, xs, logits, ys.float())
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+                scheduler.step()
+
+            else:
+                with torch.no_grad():
+                    outputs = self.model(xs)
+                    recon_x = outputs["recon"]
+                    logits = outputs["mask"]
+
+                    logits = logits.view(ys.shape)
+                    loss = self.loss(recon_x, xs, logits, ys.float())
+
+            # metric
+            loss_meter.update(loss.item(), len(ys))
+
+            confidences = torch.sigmoid(logits)
+            flat_confidence = confidences.flatten().detach().cpu().numpy()
+            ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
+
+            epoch_metrics.update(
+                calculate_metrics(
+                    flat_confidence,
+                    ground_truths,
+                    threshold=threshold,
+                )
+            )
+
+            if save_plot:
+                for x, y, patch_confidence in zip(xs, ys, confidences):
+                    mean = [0.485, 0.456, 0.406]
+                    sd = [0.229, 0.224, 0.225]
+                    original_x = ToPILImage()(
+                        x.detach().cpu() * torch.tensor(sd)[:, None, None]
+                        + torch.tensor(mean)[:, None, None]
+                    )
+                    log_patch_and_save(
+                        image_name=f"step_{i}",
+                        original_x=np.array(original_x),
+                        original_y=y.detach().cpu().numpy(),
+                        pred_masks=patch_confidence.detach().cpu().numpy() >= 0.5,
+                        artifact_dir=f"{phase}_prediction",
+                    )
+                    i += 1
+
+            bar.suffix = self.make_bar_sentence(
+                phase=phase,
+                epoch=epoch,
+                step=step,
+                total_step=total_step,
+                eta=bar.eta,
+                total_loss=loss_meter.avg,
+                metrics=epoch_metrics,
+            )
+            bar.next()
+
+        bar.finish()
+
+        return (loss_meter, epoch_metrics)
