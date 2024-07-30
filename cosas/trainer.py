@@ -403,34 +403,14 @@ class SSLTrainer(ABC):
     def train(
         self,
         train_dataloader: DataLoader,
-        val_dataloader: DataLoader,
         epochs: int,
-        n_patience: int,
     ):
-
-        best_state_dict = deepcopy(self.model.state_dict())
-        best_loss = math.inf
         for epoch in range(epochs):
             train_loss, _ = self.run_epoch(
                 dataloader=train_dataloader, epoch=epoch, phase="train"
             )
             mlflow.log_metric("train_loss", train_loss.avg, step=epoch)
 
-            val_loss, val_metrics = self.run_epoch(
-                dataloader=val_dataloader, epoch=epoch, phase="val"
-            )
-            mlflow.log_metric("val_loss", val_loss.avg, step=epoch)
+        mlflow.pytorch.log_model(self.model, "encoder")
 
-            if val_loss.avg < best_loss:
-                best_loss = val_loss.avg
-                patience = 0
-                best_state_dict = deepcopy(self.model.state_dict())
-            else:
-                patience += 1
-                if patience >= n_patience:
-                    self.logger.info("Early stopping after epoch {}".format(epoch))
-                    break
-
-        self.model.load_state_dict(best_state_dict)
-
-        return train_loss, val_loss
+        return train_loss
