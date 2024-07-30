@@ -157,6 +157,7 @@ class BinaryClassifierTrainer(ABC):
             # metric
             loss_meter.update(loss.item(), len(ys))
 
+            logits = torch.clip(logits, -1e10, 1e10)
             confidences = torch.sigmoid(logits)
             flat_confidence = confidences.flatten().detach().cpu().numpy()
             ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
