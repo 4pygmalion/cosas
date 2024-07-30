@@ -208,11 +208,10 @@ class SupConLoss(nn.Module):
 class AELoss(torch.nn.Module):
     def __init__(self):
         super(AELoss, self).__init__()
+        self.mcc = MCCLosswithLogits()
 
     def forward(self, recon_x, x, logits, targets):
-        mask_error = torch.nn.functional.binary_cross_entropy_with_logits(
-            logits, targets
-        )
+        mask_error = self.mcc(logits, targets)
         recon_error = torch.nn.functional.mse_loss(recon_x, x)
 
         return mask_error + recon_error
