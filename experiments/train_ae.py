@@ -54,7 +54,7 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser.add_argument("--encoder_name", type=str, required=True)
     parser.add_argument("--use_sparisty_loss", action="store_true", default=False)
-    parser.add_argument("--alpha", type=float, default=1)
+    parser.add_argument("--alpha", type=float, default=1.0)
 
     return parser.parse_args()
 
