@@ -54,6 +54,7 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser.add_argument("--encoder_name", type=str, required=True)
     parser.add_argument("--use_sparisty_loss", action="store_true", default=False)
+    parser.add_argument("--alpha", type=float, default=1)
 
     return parser.parse_args()
 
@@ -137,7 +138,7 @@ if __name__ == "__main__":
             dp_model = torch.nn.DataParallel(model)
             trainer = AETrainer(
                 model=dp_model,
-                loss=AELoss(args.use_sparisty_loss),
+                loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
                 optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
                 device=args.device,
             )
