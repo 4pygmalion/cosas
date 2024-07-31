@@ -29,6 +29,7 @@ def get_config() -> argparse.ArgumentParser:
     Note:
         num_workers 필요없음. 이미 메모리에 다 올려서 필요없는듯
     """
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -52,7 +53,20 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model_name", type=str, help="Model name", default="autoencoder"
     )
+    arch_choices = [
+        "Unet",
+        "UnetPlusPlus",
+        "MAnet",
+        "Linknet",
+        "FPN",
+        "PSPNet",
+        "DeepLabV3",
+        "DeepLabV3Plus",
+        "PAN",
+    ]
+    parser.add_argument("--architecture", type=str, required=True, choices=arch_choices)
     parser.add_argument("--encoder_name", type=str, required=True)
+
     parser.add_argument("--use_sparisty_loss", action="store_true", default=False)
     parser.add_argument("--alpha", type=float, default=1.0)
 
@@ -132,7 +146,9 @@ if __name__ == "__main__":
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
             model = MultiTaskAE(
-                args.encoder_name, input_size=(args.input_size, args.input_size)
+                architecture=args.architecture,
+                encoder_name=args.encoder_name,
+                input_size=(args.input_size, args.input_size),
             ).to(args.device)
 
             dp_model = torch.nn.DataParallel(model)
