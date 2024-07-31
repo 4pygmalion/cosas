@@ -14,7 +14,7 @@ from cosas.networks import MultiTaskAE
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import CopyTransform
-from cosas.losses import LOSS_REGISTRY
+from cosas.losses import AELoss
 from cosas.misc import set_seed, get_config
 from cosas.trainer import AETrainer
 from cosas.tracking import TRACKING_URI, get_experiment
@@ -34,7 +34,7 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser.add_argument("--run_name", type=str, default="baseline", help="Run name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
+    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     parser.add_argument(
@@ -53,6 +53,7 @@ def get_config() -> argparse.ArgumentParser:
         "--model_name", type=str, help="Model name", default="autoencoder"
     )
     parser.add_argument("--encoder_name", type=str, required=True)
+    parser.add_argument("--use_sparisty_loss", action="store_true", default=False)
 
     return parser.parse_args()
 
@@ -136,7 +137,7 @@ if __name__ == "__main__":
             dp_model = torch.nn.DataParallel(model)
             trainer = AETrainer(
                 model=dp_model,
-                loss=LOSS_REGISTRY[args.loss](),
+                loss=AELoss(args.use_sparisty_loss),
                 optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
                 device=args.device,
             )
