@@ -469,7 +469,12 @@ class MultiTaskAE(torch.nn.Module):
             axis=1,
         )
 
-        return {"recon": recon, "mask": self.mask_head(stain_info)}
+        return {
+            "recon": recon,
+            "mask": self.mask_head(stain_info),
+            "vector": output["vector"],
+            "density": output["denisty"],
+        }
 
 
 MODEL_REGISTRY = {

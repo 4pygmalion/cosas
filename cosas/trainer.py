@@ -462,9 +462,11 @@ class AETrainer(BinaryClassifierTrainer):
                 outputs = self.model(xs)
                 recon_x = outputs["recon"]
                 logits = outputs["mask"]
+                vector = outputs["vector"]
+                density = outputs["density"]
 
                 logits = logits.view(ys.shape)
-                loss = self.loss(recon_x, xs, logits, ys.float())
+                loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -476,9 +478,10 @@ class AETrainer(BinaryClassifierTrainer):
                     outputs = self.model(xs)
                     recon_x = outputs["recon"]
                     logits = outputs["mask"]
-
+                    vector = outputs["vector"]
+                    density = outputs["density"]
                     logits = logits.view(ys.shape)
-                    loss = self.loss(recon_x, xs, logits, ys.float())
+                    loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
 
             # metric
             loss_meter.update(loss.item(), len(ys))
