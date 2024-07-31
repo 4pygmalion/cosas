@@ -423,14 +423,17 @@ class TransUNet(nn.Module):
 
 
 class MultiTaskAE(torch.nn.Module):
-    def __init__(self, encoder_name, input_size=(224, 224)):
+    def __init__(self, architecture, encoder_name, input_size=(224, 224)):
         super(MultiTaskAE, self).__init__()
 
         self.encoder_name = encoder_name
         self.input_size = input_size
 
-        self.unet = smp.Unet(encoder_name=self.encoder_name, classes=6)
-        self.encoder = self.unet.encoder
+        self.architecture = getattr(smp, architecture)(
+            encoder_name=self.encoder_name, classes=6
+        )
+        # self.unet = smp.Unet(encoder_name=self.encoder_name, classes=6)
+        self.encoder = self.architecture.encoder
         self.stain_app = UnetDecoder(
             encoder_channels=self.encoder.out_channels,
             decoder_channels=(256, 128, 64, 32, 2),
@@ -440,11 +443,11 @@ class MultiTaskAE(torch.nn.Module):
         )
 
     def reconstruction(self, x):
-        z = self.unet.encoder(x)
+        z = self.architecture.encoder(x)
 
         # Stain vectors (B, 2, 3, W, H)
-        x = self.unet.decoder(*z)  # (6, W, H)
-        x = self.unet.segmentation_head(x)  # (B, 6, W, H)
+        x = self.architecture.decoder(*z)  # (6, W, H)
+        x = self.architecture.segmentation_head(x)  # (B, 6, W, H)
         stain_vectors = x.view(-1, 2, 3, *self.input_size)  # (B, 2, 3, W, H)
 
         # Stain Density (B, 2, W, H)
