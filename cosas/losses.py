@@ -205,15 +205,12 @@ class SupConLoss(nn.Module):
         return loss
 
 
-class SparsityLoss(torch.nn.Module):
+class SparsityLoss(nn.Module):
     def __init__(self):
         super(SparsityLoss, self).__init__()
 
-    def calculate_l2(self, tensor):
-        return torch.nn.functional.normalize(tensor) ** 2
-
     def forward(self, vector, density):
-        """_summary_
+        """Sparsity loss
 
         Args:
             vector (torch.Tensor): (N, 2, 3, W, H)
@@ -222,25 +219,16 @@ class SparsityLoss(torch.nn.Module):
         Returns:
             _type_: _description_
         """
+        stain1_vector, stain2_vector = torch.unbind(vector, dim=1)  # (N, 3, W, H)
+        stain1_density, stain2_density = torch.unbind(
+            density.unsqueeze(2), dim=1
+        )  # (N, 1, W, H)
 
-        w, h = vector.shape[-2:]
-        stain1_vector, stain2_vector = torch.unbind(vector, dim=1)  # (B, 3, W, H)
-        stain1_density, stain2_density = torch.unbind(density, dim=1)  # (B, W, H)
+        stain1_sparsity = torch.norm(stain1_vector * stain1_density, p=2, dim=1) ** 2
+        stain2_sparsity = torch.norm(stain2_vector * stain2_density, p=2, dim=1) ** 2
 
-        stain1_sparisty = (
-            torch.einsum("bcwh,bwh->bcwh", stain1_vector, stain1_density)
-            .view(-1, w, h)
-            .norm(dim=0)
-        )
-        stain2_sparisty = (
-            torch.einsum("bcwh,bwh->bcwh", stain2_vector, stain2_density)
-            .view(-1, w, h)
-            .norm(dim=0)
-        )
-
-        penality = stain1_sparisty + stain2_sparisty
-
-        return penality.mean()
+        penalty = stain1_sparsity + stain2_sparsity
+        return penalty.mean()
 
 
 class AELoss(torch.nn.Module):
