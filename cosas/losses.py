@@ -230,7 +230,7 @@ class SparsityLoss(torch.nn.Module):
             dim=1
         )  # (B, 3, W, H)
         stain2_sparisty = torch.multiply(stain2_vector, stain2_density).norm(
-            dim=2
+            dim=1
         )  # (B, 3, W, H)
 
         penality = stain1_sparisty + stain2_sparisty
