@@ -223,15 +223,20 @@ class SparsityLoss(torch.nn.Module):
             _type_: _description_
         """
 
+        w, h = vector.shape[-2:]
         stain1_vector, stain2_vector = torch.unbind(vector, dim=1)  # (B, 3, W, H)
         stain1_density, stain2_density = torch.unbind(density, dim=1)  # (B, W, H)
 
-        stain1_sparisty = torch.multiply(stain1_vector, stain1_density).norm(
-            dim=1
-        )  # (B, 3, W, H)
-        stain2_sparisty = torch.multiply(stain2_vector, stain2_density).norm(
-            dim=1
-        )  # (B, 3, W, H)
+        stain1_sparisty = (
+            torch.einsum("bcwh,bwh->bcwh", stain1_vector, stain1_density)
+            .view(-1, w, h)
+            .norm(dim=0)
+        )
+        stain2_sparisty = (
+            torch.einsum("bcwh,bwh->bcwh", stain2_vector, stain2_density)
+            .view(-1, w, h)
+            .norm(dim=0)
+        )
 
         penality = stain1_sparisty + stain2_sparisty
 
