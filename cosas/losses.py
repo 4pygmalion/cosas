@@ -205,16 +205,51 @@ class SupConLoss(nn.Module):
         return loss
 
 
+class SparsityLoss(torch.nn.Module):
+    def __init__(self):
+        super(SparsityLoss, self).__init__()
+
+    def calculate_l2(self, tensor):
+        return torch.nn.functional.normalize(tensor) ** 2
+
+    def forward(self, vector, density):
+        """_summary_
+
+        Args:
+            vector (torch.Tensor): (N, 2, 3, W, H)
+            density (torch.Tensor): (N, 2, W, H)
+
+        Returns:
+            _type_: _description_
+        """
+
+        stain1_vector, stain2_vector = torch.unbind(vector, dim=1)  # (B, 3, W, H)
+        stain1_density, stain2_density = torch.unbind(density, dim=1)  # (B, W, H)
+
+        stain1_sparisty = torch.multiply(stain1_vector, stain1_density).norm(
+            dim=1
+        )  # (B, 3, W, H)
+        stain2_sparisty = torch.multiply(stain2_vector, stain2_density).norm(
+            dim=2
+        )  # (B, 3, W, H)
+
+        penality = stain1_sparisty + stain2_sparisty
+
+        return penality.mean()
+
+
 class AELoss(torch.nn.Module):
     def __init__(self):
         super(AELoss, self).__init__()
         self.mcc = MCCLosswithLogits()
+        self.sparsity_loss = SparsityLoss()
 
-    def forward(self, recon_x, x, logits, targets):
+    def forward(self, recon_x, x, logits, targets, vector, desnity):
         mask_error = self.mcc(logits, targets)
         recon_error = torch.nn.functional.mse_loss(recon_x, x)
+        sparisty_penalty = self.sparsity_loss(vector, desnity)
 
-        return mask_error + recon_error
+        return mask_error + recon_error + sparisty_penalty
 
 
 LOSS_REGISTRY = {
