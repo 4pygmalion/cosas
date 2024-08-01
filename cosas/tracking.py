@@ -1,4 +1,5 @@
 import os
+import uuid
 import mlflow
 import numpy as np
 
@@ -67,7 +68,8 @@ def log_patch_and_save(
         pred_y (torch.Tensor): (N, 224, 224, 1)
         artifact_dir (str): _description_
     """
-    temp_save_path = f"{image_name}.png"
+    unique_id = uuid.uuid4().hex[:8]
+    temp_save_path = f"{image_name}_{unique_id}.png"
     fig, axes = plot_patch_xypred(original_x, original_y, pred_masks)
     fig.savefig(temp_save_path)
     plt.clf()
