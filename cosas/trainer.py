@@ -486,8 +486,8 @@ class AETrainer(BinaryClassifierTrainer):
             # metric
             loss_meter.update(loss.item(), len(ys))
 
-            confidences = torch.sigmoid(logits)
-            flat_confidence = confidences.flatten().detach().cpu().numpy()
+            images_confidences = torch.sigmoid(logits)
+            flat_confidence = images_confidences.flatten().detach().cpu().numpy()
             ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
 
             epoch_metrics.update(
@@ -499,7 +499,19 @@ class AETrainer(BinaryClassifierTrainer):
             )
 
             if save_plot:
-                for x, y, patch_confidence in zip(xs, ys, confidences):
+                for i, (x, y, confidences) in enumerate(
+                    zip(xs, ys, images_confidences)
+                ):
+                    image_confidences = confidences.detach().cpu().numpy()
+                    image_lebels = y.detach().cpu().numpy()
+                    instance_metrics = calculate_metrics(
+                        image_confidences.ravel(),
+                        image_lebels.ravel(),
+                        threshold=threshold,
+                    )
+                    dice = round(instance_metrics["dice"], 4)
+                    iou = round(instance_metrics["iou"], 4)
+
                     mean = [0.485, 0.456, 0.406]
                     sd = [0.229, 0.224, 0.225]
                     original_x = ToPILImage()(
@@ -507,10 +519,10 @@ class AETrainer(BinaryClassifierTrainer):
                         + torch.tensor(mean)[:, None, None]
                     )
                     log_patch_and_save(
-                        image_name=f"step_{i}",
+                        image_name=f"step_{i}_dice_{dice}_iou_{iou}",
                         original_x=np.array(original_x),
-                        original_y=y.detach().cpu().numpy(),
-                        pred_masks=patch_confidence.detach().cpu().numpy() >= 0.5,
+                        original_y=image_lebels,
+                        pred_masks=image_confidences >= 0.5,
                         artifact_dir=f"{phase}_prediction",
                     )
                     i += 1
