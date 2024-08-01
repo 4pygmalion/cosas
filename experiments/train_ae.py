@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
-from cosas.networks import MultiTaskAE
+from cosas.networks import MultiTaskAE, MultiTaskTransAE
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import CopyTransform
@@ -63,6 +63,7 @@ def get_config() -> argparse.ArgumentParser:
         "DeepLabV3",
         "DeepLabV3Plus",
         "PAN",
+        "TransUNet",
     ]
     parser.add_argument("--architecture", type=str, required=True, choices=arch_choices)
     parser.add_argument("--encoder_name", type=str, required=True)
@@ -145,11 +146,18 @@ if __name__ == "__main__":
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
-            model = MultiTaskAE(
-                architecture=args.architecture,
-                encoder_name=args.encoder_name,
-                input_size=(args.input_size, args.input_size),
-            ).to(args.device)
+            if args.architecture != "TransUNet":
+                model = MultiTaskAE(
+                    architecture=args.architecture,
+                    encoder_name=args.encoder_name,
+                    input_size=(args.input_size, args.input_size),
+                ).to(args.device)
+            else:
+                model = MultiTaskTransAE(
+                    architecture=args.architecture,
+                    encoder_name="vit",
+                    input_size=(args.input_size, args.input_size),
+                ).to(args.device)
 
             dp_model = torch.nn.DataParallel(model)
             trainer = AETrainer(
