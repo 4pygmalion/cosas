@@ -46,7 +46,7 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument(
-        "--n_patience", type=int, default=30, help="Number of patience epochs"
+        "--n_patience", type=int, default=10, help="Number of patience epochs"
     )
     parser.add_argument("--input_size", type=int, help="Image size", required=True)
     parser.add_argument(
