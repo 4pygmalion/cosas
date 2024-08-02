@@ -171,7 +171,7 @@ if __name__ == "__main__":
             trainer = AETrainer(
                 model=dp_model,
                 loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
-                optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+                optimizer=optimizer,
                 scheduler=scheduler,
                 device=args.device,
             )
