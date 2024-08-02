@@ -45,9 +45,9 @@ def get_config() -> argparse.ArgumentParser:
         required=False,
     )
     parser.add_argument("--loss", type=str, default="multi-task", required=False)
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
     parser.add_argument(
-        "--n_patience", type=int, default=10, help="Number of patience epochs"
+        "--n_patience", type=int, default=30, help="Number of patience epochs"
     )
     parser.add_argument("--input_size", type=int, help="Image size", required=True)
     parser.add_argument(
@@ -160,6 +160,14 @@ if __name__ == "__main__":
                 ).to(args.device)
 
             dp_model = torch.nn.DataParallel(model)
+            optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+            scheduler = torch.optim.lr_scheduler.CyclicLR(
+                optimizer,
+                base_lr=0.001,
+                max_lr=0.1,
+                step_size_up=int(len(train_dataloader)) * 4,
+                step_size_down=int(len(train_dataloader)) * 4,
+            )
             trainer = AETrainer(
                 model=dp_model,
                 loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
