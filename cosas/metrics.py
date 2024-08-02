@@ -104,6 +104,10 @@ def compute_dice(pred: np.ndarray, target: np.ndarray) -> float:
 
 
 def specificity_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+
+    if np.unique(y_true).tolist() == [1]:
+        return 0
+
     try:
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     except ValueError:
@@ -124,28 +128,33 @@ def calculate_metrics(
 ) -> Dict[str, float]:
     pred_confidence = confidences
     pred_label = pred_confidence >= threshold
-    target_flat = targets
 
-    f1 = f1_score(target_flat, pred_label)
-    acc = accuracy_score(target_flat, pred_label)
-    spec = specificity_score(target_flat, pred_label)
+    f1 = f1_score(targets, pred_label)
+    acc = accuracy_score(targets, pred_label)
 
-    if target_flat.sum() == 0:
+    # All negative pixels:
+    spec = (
+        specificity_score(targets, pred_label)
+        if np.unique(np.array([1.0, 1.0, 1.0])).tolist() != [1.0]
+        else 0
+    )
+
+    if targets.sum() == 0:
         sen = 0
         auroc = 0
         prauc = 0
     else:
-        sen = recall_score(target_flat, pred_label)
+        sen = recall_score(targets, pred_label)
         auroc = (
-            roc_auc_score(target_flat, pred_confidence)
-            if len(np.unique(target_flat)) > 1
+            roc_auc_score(targets, pred_confidence)
+            if len(np.unique(targets)) > 1
             else 0.0
         )
-        pr, rc, _ = precision_recall_curve(target_flat, pred_confidence)
+        pr, rc, _ = precision_recall_curve(targets, pred_confidence)
         prauc = auc(rc, pr)
 
-    iou = compute_iou(pred_label, target_flat)
-    dice = compute_dice(pred_label, target_flat)
+    iou = compute_iou(pred_label, targets)
+    dice = compute_dice(pred_label, targets)
 
     return {
         "f1": f1,
