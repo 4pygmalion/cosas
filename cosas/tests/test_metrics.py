@@ -17,6 +17,7 @@ def test_calculate_metrics1():
         pytest.param(np.array([0, 0, 0, 0]), np.array([0, 0, 0, 0]), 1, id="TEST2"),
         pytest.param(np.array([0, 0, 0, 0]), np.array([1, 1, 1, 1]), 0, id="TEST3"),
         pytest.param(np.array([1, 1, 1, 1]), np.array([1, 1, 1, 1]), 0, id="TEST4"),
+        pytest.param(np.array([1, 1, 1, 1]), np.array([0, 0, 0, 0]), 0, id="TEST5"),
     ],
 )
 def test_specificity_score(y_true, y_pred, expected):
