@@ -172,6 +172,7 @@ if __name__ == "__main__":
                 model=dp_model,
                 loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
                 optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+                scheduler=scheduler,
                 device=args.device,
             )
 
