@@ -14,7 +14,7 @@ WORKDIR $PROJECTDIR
 COPY ./cosas/ $PROJECTDIR
 COPY ./inference.py $PROJECTDIR
 COPY ./requirements.txt $PROJECTDIR
-COPY checkpoint.pth $PROJECTDIR
+COPY ./checkpoint.pth $PROJECTDIR
 
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install -r requirements.txt
