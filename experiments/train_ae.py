@@ -163,10 +163,10 @@ if __name__ == "__main__":
             optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
             scheduler = torch.optim.lr_scheduler.CyclicLR(
                 optimizer,
-                base_lr=0.001,
-                max_lr=0.1,
-                step_size_up=int(len(train_dataloader)) * 4,
-                step_size_down=int(len(train_dataloader)) * 4,
+                base_lr=0.0001,
+                max_lr=0.01,
+                step_size_up=int(len(train_dataloader)) * 2,
+                step_size_down=int(len(train_dataloader)) * 2,
             )
             trainer = AETrainer(
                 model=dp_model,
