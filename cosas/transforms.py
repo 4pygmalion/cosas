@@ -243,7 +243,7 @@ def get_transforms(input_size):
     return train_transform, test_transform
 
 
-class ElasticDeform(A.DualTransform):
+class GridElasticTransform(A.DualTransform):
     """Elastic deformation Albumentation implemtnation
 
     As well as the probability, the granularity of the distortions
@@ -267,10 +267,6 @@ class ElasticDeform(A.DualTransform):
         p: float = 1.0,
         always_apply: bool | None = None,
     ):
-        """
-        Params:
-            grid_width (int): 그리드의 수
-        """
         super().__init__(p=p, always_apply=always_apply)
         self.n_grid_width = n_grid_width
         self.n_grid_height = n_grid_height

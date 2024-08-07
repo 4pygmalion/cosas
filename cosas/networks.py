@@ -428,15 +428,9 @@ class MultiTaskAE(torch.nn.Module):
 
         self.encoder_name = encoder_name
         self.input_size = input_size
-
-        if hasattr(smp, architecture):
-            self.architecture = getattr(smp, architecture)(
-                encoder_name=self.encoder_name,
-                classes=6,
-                encoder_weights=None,
-            )
-        else:
-            raise ValueError(f"Unsupported architecture: {architecture}")
+        self.architecture = getattr(smp, architecture)(
+            encoder_name=self.encoder_name, classes=6
+        )
 
         self.stain_vec_head = self.architecture.segmentation_head
 
