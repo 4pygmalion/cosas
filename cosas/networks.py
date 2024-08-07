@@ -431,6 +431,7 @@ class MultiTaskAE(torch.nn.Module):
         self.architecture = getattr(smp, architecture)(
             encoder_name=self.encoder_name, classes=6
         )
+
         self.stain_vec_head = self.architecture.segmentation_head
 
         self.encoder = self.architecture.encoder

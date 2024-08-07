@@ -1,9 +1,11 @@
+import random
 import math
-from typing import Tuple, List
+from typing import Tuple, List, Dict, Any
 
 import numpy as np
 import torch
 import albumentations as A
+from PIL import Image
 from torchvision.transforms.functional import pad
 from albumentations.pytorch.transforms import ToTensorV2
 from histomicstk.preprocessing.color_conversion import rgb_to_lab
@@ -239,3 +241,141 @@ def get_transforms(input_size):
     )
 
     return train_transform, test_transform
+
+
+class GridElasticTransform(A.DualTransform):
+    """Elastic deformation Albumentation implemtnation
+
+    As well as the probability, the granularity of the distortions
+        produced by this class can be controlled using the width and
+        height of the overlaying distortion grid. The larger the height
+        and width of the grid, the smaller the distortions. This means
+        that larger grid sizes can result in finer, less severe distortions.
+        As well as this, the magnitude of the distortions vectors can
+        also be adjusted.
+
+
+    Original source:
+        https://github.com/mdbloice/Augmentor/blob/master/Augmentor/Operations.py#L1355
+    """
+
+    def __init__(
+        self,
+        n_grid_width: int,
+        n_grid_height: int,
+        magnitude: int,
+        p: float = 1.0,
+        always_apply: bool | None = None,
+    ):
+        super().__init__(p=p, always_apply=always_apply)
+        self.n_grid_width = n_grid_width
+        self.n_grid_height = n_grid_height
+        self.magnitude = abs(magnitude)
+
+    def calculate_dimensions(
+        self,
+        width_of_square,
+        height_of_square,
+        width_of_last_square,
+        height_of_last_square,
+    ):
+        dimensions = []
+        for vertical_tile in range(self.n_grid_width):
+            for horizontal_tile in range(self.n_grid_height):
+                x1 = horizontal_tile * width_of_square
+                y1 = vertical_tile * height_of_square
+                x2 = x1 + (
+                    width_of_last_square
+                    if horizontal_tile == self.n_grid_height - 1
+                    else width_of_square
+                )
+                y2 = y1 + (
+                    height_of_last_square
+                    if vertical_tile == self.n_grid_width - 1
+                    else height_of_square
+                )
+                dimensions.append([x1, y1, x2, y2])
+
+        return dimensions
+
+    def calculate_polygons(self, dimensions, horizontal_tiles, vertical_tiles):
+        polygons = []
+        for x1, y1, x2, y2 in dimensions:
+            polygons.append([x1, y1, x1, y2, x2, y2, x2, y1])
+
+        last_column = [
+            (horizontal_tiles - 1) + horizontal_tiles * i for i in range(vertical_tiles)
+        ]
+        last_row = range(
+            (horizontal_tiles * vertical_tiles) - horizontal_tiles,
+            horizontal_tiles * vertical_tiles,
+        )
+
+        polygon_indices = []
+        for i in range((vertical_tiles * horizontal_tiles) - 1):
+            if i not in last_row and i not in last_column:
+                polygon_indices.append(
+                    [i, i + 1, i + horizontal_tiles, i + 1 + horizontal_tiles]
+                )
+
+        for a, b, c, d in polygon_indices:
+            dx = random.randint(-self.magnitude, self.magnitude)
+            dy = random.randint(-self.magnitude, self.magnitude)
+
+            polygons[a][4] += dx
+            polygons[a][5] += dy
+            polygons[b][2] += dx
+            polygons[b][3] += dy
+            polygons[c][6] += dx
+            polygons[c][7] += dy
+            polygons[d][0] += dx
+            polygons[d][1] += dy
+
+        return polygons
+
+    def generate_mesh(self, polygons, dimensions):
+        return [[dimensions[i], polygons[i]] for i in range(len(dimensions))]
+
+    def distort_image(self, image: np.ndarray, generated_mesh: List[List]):
+        image = Image.fromarray(image)
+        return np.array(
+            image.transform(
+                image.size, Image.MESH, generated_mesh, resample=Image.BICUBIC
+            )
+        )
+
+    def get_params_dependent_on_data(
+        self, params: Dict[str, Any], data: dict[str, Any]
+    ) -> Dict[str, Any]:
+
+        img = data["image"]
+        h, w = img.shape[:2]
+
+        horizontal_tiles = self.n_grid_width
+        vertical_tiles = self.n_grid_height
+
+        width_of_square = int(w / horizontal_tiles)
+        height_of_square = int(h / vertical_tiles)
+
+        width_of_last_square = w - (width_of_square * (horizontal_tiles - 1))
+        height_of_last_square = h - (height_of_square * (vertical_tiles - 1))
+
+        dimensions = self.calculate_dimensions(
+            width_of_square,
+            height_of_square,
+            width_of_last_square,
+            height_of_last_square,
+        )
+        polygons = self.calculate_polygons(dimensions, horizontal_tiles, vertical_tiles)
+        generated_mesh = self.generate_mesh(polygons, dimensions)
+
+        return {"generated_mesh": generated_mesh}
+
+    def apply(self, img, generated_mesh, **params):
+        return self.distort_image(img, generated_mesh)
+
+    def apply_to_mask(self, mask, generated_mesh, **params):
+        return self.distort_image(mask, generated_mesh)
+
+    def get_transform_init_args_names(self):
+        return ("n_grid_width", "n_grid_height", "magnitude")
