@@ -1,6 +1,8 @@
 import math
-from typing import Tuple, List
+from typing import Tuple, List, Dict, Any
 
+from PIL import Image
+import cv2
 import numpy as np
 import torch
 import albumentations as A
@@ -324,7 +326,6 @@ class Distort(Operation):
         self.grid_width = grid_width
         self.grid_height = grid_height
         self.magnitude = abs(magnitude)
-        # TODO: Implement non-random magnitude.
         self.randomise_magnitude = True
 
     def perform_operation(self, images):
@@ -450,14 +451,10 @@ class Distort(Operation):
         return augmented_images
 
 
-class Distort(Operation):
-    """
-    This class performs randomised, elastic distortions on images.
-    """
+class ElasticDeform(A.DualTransform):
+    """Elastic deformation Albumentation implemtnation
 
-    def __init__(self, probability, grid_width, grid_height, magnitude):
-        """
-        As well as the probability, the granularity of the distortions
+    As well as the probability, the granularity of the distortions
         produced by this class can be controlled using the width and
         height of the overlaying distortion grid. The larger the height
         and width of the grid, the smaller the distortions. This means
@@ -465,107 +462,66 @@ class Distort(Operation):
         As well as this, the magnitude of the distortions vectors can
         also be adjusted.
 
-        :param probability: Controls the probability that the operation is
-         performed when it is invoked in the pipeline.
-        :param grid_width: The width of the gird overlay, which is used
-         by the class to apply the transformations to the image.
-        :param grid_height: The height of the gird overlay, which is used
-         by the class to apply the transformations to the image.
-        :param magnitude: Controls the degree to which each distortion is
-         applied to the overlaying distortion grid.
-        :type probability: Float
-        :type grid_width: Integer
-        :type grid_height: Integer
-        :type magnitude: Integer
+
+    Original source:
+        https://github.com/mdbloice/Augmentor/blob/master/Augmentor/Operations.py#L1355
+    """
+
+    def __init__(
+        self,
+        n_grid_width: int,
+        n_grid_height: int,
+        magnitude: int,
+        p: float = 1.0,
+        always_apply: bool | None = None,
+    ):
         """
-        Operation.__init__(self, probability)
-        self.grid_width = grid_width
-        self.grid_height = grid_height
+        Params:
+            grid_width (int): 그리드의 수
+        """
+        super().__init__(p=p, always_apply=always_apply)
+        self.n_grid_width = n_grid_width
+        self.n_grid_height = n_grid_height
         self.magnitude = abs(magnitude)
-        # TODO: Implement non-random magnitude.
-        self.randomise_magnitude = True
 
-    def perform_operation(self, images):
-        """
-        Distorts the passed image(s) according to the parameters supplied during
-        instantiation, returning the newly distorted image.
-
-        :param images: The image(s) to be distorted.
-        :type images: List containing PIL.Image object(s).
-        :return: The transformed image(s) as a list of object(s) of type
-         PIL.Image.
-        """
-
-        w, h = images[0].size
-
-        horizontal_tiles = self.grid_width
-        vertical_tiles = self.grid_height
-
-        width_of_square = int(floor(w / float(horizontal_tiles)))
-        height_of_square = int(floor(h / float(vertical_tiles)))
-
-        width_of_last_square = w - (width_of_square * (horizontal_tiles - 1))
-        height_of_last_square = h - (height_of_square * (vertical_tiles - 1))
-
+    def calculate_dimensions(
+        self,
+        width_of_square,
+        height_of_square,
+        width_of_last_square,
+        height_of_last_square,
+    ):
         dimensions = []
+        for vertical_tile in range(self.n_grid_width):
+            for horizontal_tile in range(self.n_grid_height):
+                x1 = horizontal_tile * width_of_square
+                y1 = vertical_tile * height_of_square
+                x2 = x1 + (
+                    width_of_last_square
+                    if horizontal_tile == self.n_grid_height - 1
+                    else width_of_square
+                )
+                y2 = y1 + (
+                    height_of_last_square
+                    if vertical_tile == self.n_grid_width - 1
+                    else height_of_square
+                )
+                dimensions.append([x1, y1, x2, y2])
 
-        for vertical_tile in range(vertical_tiles):
-            for horizontal_tile in range(horizontal_tiles):
-                if vertical_tile == (vertical_tiles - 1) and horizontal_tile == (
-                    horizontal_tiles - 1
-                ):
-                    dimensions.append(
-                        [
-                            horizontal_tile * width_of_square,
-                            vertical_tile * height_of_square,
-                            width_of_last_square + (horizontal_tile * width_of_square),
-                            height_of_last_square + (height_of_square * vertical_tile),
-                        ]
-                    )
-                elif vertical_tile == (vertical_tiles - 1):
-                    dimensions.append(
-                        [
-                            horizontal_tile * width_of_square,
-                            vertical_tile * height_of_square,
-                            width_of_square + (horizontal_tile * width_of_square),
-                            height_of_last_square + (height_of_square * vertical_tile),
-                        ]
-                    )
-                elif horizontal_tile == (horizontal_tiles - 1):
-                    dimensions.append(
-                        [
-                            horizontal_tile * width_of_square,
-                            vertical_tile * height_of_square,
-                            width_of_last_square + (horizontal_tile * width_of_square),
-                            height_of_square + (height_of_square * vertical_tile),
-                        ]
-                    )
-                else:
-                    dimensions.append(
-                        [
-                            horizontal_tile * width_of_square,
-                            vertical_tile * height_of_square,
-                            width_of_square + (horizontal_tile * width_of_square),
-                            height_of_square + (height_of_square * vertical_tile),
-                        ]
-                    )
+        return dimensions
 
-        # For loop that generates polygons could be rewritten, but maybe harder to read?
-        # polygons = [x1,y1, x1,y2, x2,y2, x2,y1 for x1,y1, x2,y2 in dimensions]
+    def calculate_polygons(self, dimensions, horizontal_tiles, vertical_tiles):
+        polygons = []
+        for x1, y1, x2, y2 in dimensions:
+            polygons.append([x1, y1, x1, y2, x2, y2, x2, y1])
 
-        # last_column = [(horizontal_tiles - 1) + horizontal_tiles * i for i in range(vertical_tiles)]
-        last_column = []
-        for i in range(vertical_tiles):
-            last_column.append((horizontal_tiles - 1) + horizontal_tiles * i)
-
+        last_column = [
+            (horizontal_tiles - 1) + horizontal_tiles * i for i in range(vertical_tiles)
+        ]
         last_row = range(
             (horizontal_tiles * vertical_tiles) - horizontal_tiles,
             horizontal_tiles * vertical_tiles,
         )
-
-        polygons = []
-        for x1, y1, x2, y2 in dimensions:
-            polygons.append([x1, y1, x1, y2, x2, y2, x2, y1])
 
         polygon_indices = []
         for i in range((vertical_tiles * horizontal_tiles) - 1):
@@ -578,31 +534,60 @@ class Distort(Operation):
             dx = random.randint(-self.magnitude, self.magnitude)
             dy = random.randint(-self.magnitude, self.magnitude)
 
-            x1, y1, x2, y2, x3, y3, x4, y4 = polygons[a]
-            polygons[a] = [x1, y1, x2, y2, x3 + dx, y3 + dy, x4, y4]
+            polygons[a][4] += dx
+            polygons[a][5] += dy
+            polygons[b][2] += dx
+            polygons[b][3] += dy
+            polygons[c][6] += dx
+            polygons[c][7] += dy
+            polygons[d][0] += dx
+            polygons[d][1] += dy
 
-            x1, y1, x2, y2, x3, y3, x4, y4 = polygons[b]
-            polygons[b] = [x1, y1, x2 + dx, y2 + dy, x3, y3, x4, y4]
+        return polygons
 
-            x1, y1, x2, y2, x3, y3, x4, y4 = polygons[c]
-            polygons[c] = [x1, y1, x2, y2, x3, y3, x4 + dx, y4 + dy]
+    def generate_mesh(self, polygons, dimensions):
+        return [[dimensions[i], polygons[i]] for i in range(len(dimensions))]
 
-            x1, y1, x2, y2, x3, y3, x4, y4 = polygons[d]
-            polygons[d] = [x1 + dx, y1 + dy, x2, y2, x3, y3, x4, y4]
-
-        generated_mesh = []
-        for i in range(len(dimensions)):
-            generated_mesh.append([dimensions[i], polygons[i]])
-
-        def do(image):
-            print(generated_mesh)
-            return image.transform(
+    def distort_image(self, image: np.ndarray, generated_mesh: List[List]):
+        image = Image.fromarray(image)
+        return np.array(
+            image.transform(
                 image.size, Image.MESH, generated_mesh, resample=Image.BICUBIC
             )
+        )
 
-        augmented_images = []
+    def get_params_dependent_on_data(
+        self, params: Dict[str, Any], data: dict[str, Any]
+    ) -> Dict[str, Any]:
 
-        for image in images:
-            augmented_images.append(do(image))
+        img = data["image"]
+        h, w = img.shape[:2]
 
-        return augmented_images
+        horizontal_tiles = self.n_grid_width
+        vertical_tiles = self.n_grid_height
+
+        width_of_square = int(w / horizontal_tiles)
+        height_of_square = int(h / vertical_tiles)
+
+        width_of_last_square = w - (width_of_square * (horizontal_tiles - 1))
+        height_of_last_square = h - (height_of_square * (vertical_tiles - 1))
+
+        dimensions = self.calculate_dimensions(
+            width_of_square,
+            height_of_square,
+            width_of_last_square,
+            height_of_last_square,
+        )
+        polygons = self.calculate_polygons(dimensions, horizontal_tiles, vertical_tiles)
+        generated_mesh = self.generate_mesh(polygons, dimensions)
+
+        return {"generated_mesh": generated_mesh}
+
+    def apply(self, img, generated_mesh, **params):
+        return self.distort_image(img, generated_mesh)
+
+    def apply_to_mask(self, mask, generated_mesh, **params):
+        return self.distort_image(mask, generated_mesh)
+
+    def get_transform_init_args_names(self):
+        return ("n_grid_width", "n_grid_height", "magnitude")
