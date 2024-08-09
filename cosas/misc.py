@@ -1,9 +1,11 @@
 import argparse
 from typing import Tuple
 
+import math
 import random
 import numpy as np
 import torch
+from torch.optim.lr_scheduler import _LRScheduler
 from torchvision.transforms import ToPILImage
 from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -198,8 +200,7 @@ def plot_xypred(
     return fig, axes
 
 
-import math
-from torch.optim.lr_scheduler import _LRScheduler
+
 
 
 class CosineAnnealingWarmUpRestarts(_LRScheduler):
