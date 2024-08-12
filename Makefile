@@ -7,12 +7,12 @@ build:
 		exit 1; \
 	fi
 	cp ${MODEL_PATH} ./model.pth
-	sudo docker build -t $(IMAGE_NAME) .
+	docker build -t $(IMAGE_NAME) .
 
-.PHONY: run
-run:
-	sudo docker run \
+.PHONY: test_run
+test_run:
+	docker run \
 	--gpus all \
-	-v /home/heon/dev/cosas/task2/input/input \
-	-v /home/heon/dev/cosas/task2/output:/output \
+	-v $(shell pwd)/task2/input/domain1:/input \
+	-v $(shell pwd)/task2/output:/output \
 	cosas:test
