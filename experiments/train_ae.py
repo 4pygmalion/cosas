@@ -42,6 +42,7 @@ def get_config() -> argparse.ArgumentParser:
         "--dataset",
         type=str,
         default="image_mask",
+        choices=list(DATASET_REGISTRY.keys()),
         required=False,
     )
     parser.add_argument("--loss", type=str, default="multi-task", required=False)
