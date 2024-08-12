@@ -12,8 +12,7 @@ torchaudio
 einops==0.3.0
 
 segmentation-models-pytorch
-albumentations 
-histomicstk --find-links https://girder.github.io/large_image_wheels
+albumentations
 
 # for CI
 pytest==8.2.2
