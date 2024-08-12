@@ -133,11 +133,10 @@ def calculate_metrics(
     acc = accuracy_score(targets, pred_label)
 
     # All negative pixels:
-    spec = (
-        specificity_score(targets, pred_label)
-        if np.unique(np.array([1.0, 1.0, 1.0])).tolist() != [1.0]
-        else 0
-    )
+    if np.sum(targets) == len(targets):
+        spec = 1.0
+    else:
+        spec = specificity_score(targets, pred_label)
 
     if targets.sum() == 0:
         sen = 0
