@@ -12,7 +12,7 @@ from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.networks import MultiTaskAE, MultiTaskTransAE
 from cosas.data_model import COSASData
-from cosas.datasets import DATASET_REGISTRY
+from cosas.datasets import DATASET_REGISTRY, ImageMaskDataset
 from cosas.transforms import CopyTransform
 from cosas.losses import AELoss
 from cosas.misc import set_seed, get_config
@@ -124,10 +124,11 @@ if __name__ == "__main__":
             train_images, val_images, train_masks, val_masks = train_test_split(
                 train_val_images, train_val_masks, test_size=0.2, random_state=args.seed
             )
-            dataset = DATASET_REGISTRY[args.dataset]
+            train_dataset_type = DATASET_REGISTRY[args.dataset]
+            test_dataset_type: ImageMaskDataset = DATASET_REGISTRY["image_mask"]
 
             train_transform, test_transform = get_transforms(args.input_size)
-            train_dataset = dataset(
+            train_dataset = train_dataset_type(
                 train_images, train_masks, train_transform, device=args.device
             )
             train_dataloader = DataLoader(
@@ -135,11 +136,11 @@ if __name__ == "__main__":
             )
 
             # VAL, TEST Dataset
-            val_dataset = dataset(
+            val_dataset = test_dataset_type(
                 val_images, val_masks, test_transform, device=args.device
             )
             val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
-            test_dataset = dataset(
+            test_dataset = test_dataset_type(
                 test_images,
                 test_masks,
                 test_transform,
