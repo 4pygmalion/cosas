@@ -1,60 +1,82 @@
 import os
-import np
-import torch
-import mlflow
-import SimpleITK #대회 주최 측에서 .mha 파일 쓰는데 문제 없다고 함
 from typing import List
 
+import numpy as np
+import torch
+import SimpleITK
+import albumentations as A
+from albumentations.pytorch.transforms import ToTensorV2
+
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def read_image(path) -> List[np.ndarray]:
     image = SimpleITK.ReadImage(path)
     return SimpleITK.GetArrayFromImage(image)
 
-# TODO
-def preprocess_image(image_array):
+
+def preprocess_image(image_array: np.ndarray, device: str):
     """[summary] preprocessing input image into model format"""
-    return
 
-# TODO
-def postprocess_image(image_array):
+    # TODO: 하드코딩이 아니라, A.Compose을 직렬화해서 불러올수 있도록
+    transform = A.Compose(
+        [
+            A.Resize(384, 384),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2(),
+        ]
+    )
+
+    return transform(image=image_array)["image"].to(device).unsqueeze(0)
+
+
+def postprocess_image(image_array: np.ndarray, original_size):
     """[summary] postprocessing model result to original image format"""
-    return
 
-# TODO
+    transform = A.Compose(
+        [
+            A.Resize(*original_size),
+        ]
+    )
+    return transform(image=image_array)["image"]
+
+
 def write_image(path, result):
-    # 주최 제공 템플릿
     image = SimpleITK.GetImageFromArray(result)
     SimpleITK.WriteImage(image, path, useCompression=False)
-    return 
+    return
 
 
 def main():
-    # 대회 주최측에서 제공한 input/output 경로 (output 있는지 확인해달라고 함)
-    input_dir = '/input/images/adenocarcinoma-image'
-    output_dir = '/output/images/adenocarcinoma-mask'
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    input_dir = "/input/images/adenocarcinoma-image"
+    output_dir = "/output/images/adenocarcinoma-mask"
     os.makedirs(output_dir, exist_ok=True)
 
-    # 모델 load 
-    model_path = os.path.join(CURRENT_DIR, "checkpoint.pth")
-    model = torch.load(model_path)
+    # 모델 load
+    model_path = os.path.join(CURRENT_DIR, "model.pth")
+    model = torch.load(model_path).eval().to(device)
 
     with torch.no_grad():
         for filename in os.listdir(input_dir):
-            if filename.endswith('.mha'):
+            if filename.endswith(".mha"):
                 output_path = os.path.join(output_dir, filename)
                 try:
                     input_path = os.path.join(input_dir, filename)
                     raw_image = read_image(input_path)
-                    image = preprocess_image(raw_image)
+                    original_size = raw_image.shape[-2:]
 
-                    raw_result = model.eval(image)
-                    #TODO
-                    result = postprocess_image(raw_result)
+                    x: torch.Tensor = preprocess_image(raw_image, device)
+                    pred = model(x)
+                    pred_mask = pred["mask"].cpu().numpy()[0]
+
+                    result = postprocess_image(pred_mask, original_size=original_size)
                     write_image(output_path, result)
+
                 except Exception as error:
                     print(error)
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()
