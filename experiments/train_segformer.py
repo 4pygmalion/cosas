@@ -84,7 +84,7 @@ if __name__ == "__main__":
                         "params": [
                             param
                             for name, param in segformer.named_parameters()
-                            if name != "decode_head"
+                            if "decode_head" not in name
                         ]
                     },
                 ],
