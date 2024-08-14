@@ -44,12 +44,14 @@ class BinaryClassifierTrainer(ABC):
         loss: torch.nn.modules.loss._Loss,
         device: str = "cuda",
         optimizer: torch.optim.Optimizer = None,
+        scheduler: torch.optim.lr_scheduler._LRScheduler = None,
         logger: logging.Logger = None,
     ):
         self.model = model
         self.loss = loss
         self.optimizer = optimizer
         self.device = device
+        self.scheduler = scheduler
         self.logger = (
             logging.Logger("BinaryClassifierTrainer") if logger is None else logger
         )
@@ -125,13 +127,6 @@ class BinaryClassifierTrainer(ABC):
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-        scheduler = torch.optim.lr_scheduler.CyclicLR(
-            self.optimizer,
-            base_lr=0.001,
-            max_lr=0.1,
-            step_size_up=int(len(dataloader)) * 4,
-            step_size_down=int(len(dataloader)) * 4,
-        )
         i = 0
         for step, batch in enumerate(dataloader):
             xs, ys = batch
@@ -146,7 +141,8 @@ class BinaryClassifierTrainer(ABC):
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                scheduler.step()
+                if self.scheduler:
+                    self.scheduler.step()
 
             else:
                 with torch.no_grad():

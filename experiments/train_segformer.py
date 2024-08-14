@@ -12,7 +12,7 @@ from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import get_transforms
 from cosas.losses import LOSS_REGISTRY
 from cosas.networks import MODEL_REGISTRY
-from cosas.misc import set_seed, get_config
+from cosas.misc import set_seed, get_config, CosineAnnealingWarmUpRestarts
 from cosas.trainer import BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
 from cosas.metrics import summarize_metrics
@@ -74,25 +74,27 @@ if __name__ == "__main__":
 
             segformer = MODEL_REGISTRY["segformer"]().to(args.device)
             dp_model = torch.nn.DataParallel(segformer)
+            optimizer = torch.optim.AdamW(
+                [
+                    {
+                        "params": segformer.model.decode_head.parameters(),
+                        "lr": args.lr * 10.0,
+                    },
+                    {
+                        "params": [
+                            param
+                            for name, param in segformer.named_parameters()
+                            if name != "decode_head"
+                        ]
+                    },
+                ],
+                lr=args.lr,
+            )
             trainer = BinaryClassifierTrainer(
                 model=dp_model,
                 loss=LOSS_REGISTRY[args.loss](),
-                optimizer=torch.optim.AdamW(
-                    [
-                        {
-                            "params": segformer.model.decode_head.parameters(),
-                            "lr": args.lr * 10.0,
-                        },
-                        {
-                            "params": [
-                                param
-                                for name, param in segformer.named_parameters()
-                                if name != "decode_head"
-                            ]
-                        },
-                    ],
-                    lr=args.lr,
-                ),
+                optimizer=optimizer,
+                scheduler=CosineAnnealingWarmUpRestarts(optimizer, T_0=150, gamma=0.5),
                 device=args.device,
             )
 
