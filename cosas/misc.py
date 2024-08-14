@@ -12,6 +12,7 @@ from .data_model import COSASData, Scanncers
 from .transforms import remove_pad, reverse_tesellation
 from .networks import MODEL_REGISTRY
 from .losses import LOSS_REGISTRY
+from .datasets import DATASET_REGISTRY
 
 
 class SetSMPArgs(argparse.Action):
@@ -38,7 +39,7 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dataset",
         type=str,
-        choices=["patch", "image_mask", "whole", "pre_aug"],
+        choices=list(DATASET_REGISTRY.keys()),
         required=True,
     )
     parser.add_argument(
