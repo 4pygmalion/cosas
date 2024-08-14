@@ -81,22 +81,17 @@ if __name__ == "__main__":
                     [
                         {
                             "params": segformer.model.decode_head.parameters(),
-                            "lr": 6e-05 * 10.0,
-                        },  # head에 대해 10배 높은 학습률
+                            "lr": args.lr * 10.0,
+                        },
                         {
                             "params": [
-                                p
-                                for n, p in segformer.named_parameters()
-                                if not any(
-                                    nd in n
-                                    for nd in ["decode_head", "norm", "pos_block"]
-                                )
+                                param
+                                for name, param in segformer.named_parameters()
+                                if name != "decode_head"
                             ]
                         },
                     ],
-                    lr=6e-05,
-                    betas=(0.9, 0.999),
-                    weight_decay=0.01,
+                    lr=args.lr,
                 ),
                 device=args.device,
             )
