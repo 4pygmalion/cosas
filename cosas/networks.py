@@ -6,6 +6,7 @@ from einops import rearrange, repeat
 from efficientnet_pytorch.utils import Conv2dStaticSamePadding
 from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
 from segmentation_models_pytorch.base.heads import SegmentationHead
+from transformers import SegformerForSemanticSegmentation
 
 from cosas.transforms import tesellation, reverse_tesellation
 
@@ -558,8 +559,26 @@ class MultiTaskTransAE(torch.nn.Module):
         }
 
 
+class Segformer(torch.nn.Module):
+    def __init__(self):
+        super(Segformer, self).__init__()
+        self.model = SegformerForSemanticSegmentation.from_pretrained(
+            "nvidia/segformer-b0-finetuned-ade-512-512"
+        )
+        self.model.decode_head.classifier = torch.nn.Conv2d(
+            256, 1, kernel_size=(1, 1), stride=(1, 1)
+        )
+
+    def forward(self, x):
+        segmentor_output = self.model(x)
+        logits = segmentor_output.logits
+
+        return torch.nn.functional.interpolate(logits, size=(512, 512), mode="bilinear")
+
+
 MODEL_REGISTRY = {
     "pyramid": PyramidSeg,
     "transunet": TransUNet,
     "autoencoder": MultiTaskAE,
+    "segformer": Segformer,
 }

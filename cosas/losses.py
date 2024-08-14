@@ -258,4 +258,5 @@ LOSS_REGISTRY = {
     "mcc": MCCLosswithLogits,
     "diceiou": DiceIoU,
     "multi-task": AELoss,
+    "bce": torch.nn.BCEWithLogitsLoss,
 }
