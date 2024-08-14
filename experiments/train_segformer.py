@@ -1,7 +1,6 @@
 import os
 
 import mlflow
-import segmentation_models_pytorch as smp
 import torch
 from sklearn.model_selection import KFold, train_test_split
 from torch.utils.data import DataLoader
@@ -10,11 +9,7 @@ from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
-from cosas.transforms import (
-    get_transforms,
-    find_representative_lab_image,
-    get_lab_distribution,
-)
+from cosas.transforms import get_transforms
 from cosas.losses import LOSS_REGISTRY
 from cosas.networks import MODEL_REGISTRY
 from cosas.misc import set_seed, get_config
@@ -25,22 +20,6 @@ from transformers import SegformerModel
 
 EXP_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(EXP_DIR)
-
-
-def stain_normalization(train_images, val_images, test_images):
-    from histomicstk.preprocessing.color_normalization import reinhard
-    from histomicstk.preprocessing.color_conversion import rgb_to_lab
-
-    means, stds = get_lab_distribution(train_images)
-    reference_image = find_representative_lab_image(train_images, means)
-    lab_reference_image = rgb_to_lab(reference_image)
-    means = lab_reference_image.mean(axis=(0, 1))
-    stds = lab_reference_image.std(axis=(0, 1))
-    train_images = [reinhard(image, means, stds) for image in train_images]
-    val_images = [reinhard(image, means, stds) for image in val_images]
-    test_images = [reinhard(image, means, stds) for image in test_images]
-
-    return train_images, val_images, test_images
 
 
 if __name__ == "__main__":
@@ -71,11 +50,6 @@ if __name__ == "__main__":
             )
             dataset = DATASET_REGISTRY[args.dataset]
 
-            if args.use_sn:
-                train_images, val_images, test_images = stain_normalization(
-                    train_images, val_images, test_images
-                )
-
             train_transform, test_transform = get_transforms(args.input_size)
             train_dataset = dataset(
                 train_images, train_masks, train_transform, device=args.device
@@ -85,8 +59,7 @@ if __name__ == "__main__":
             )
 
             # VAL, TEST Dataset
-            if args.dataset == "pre_aug":
-                dataset = DATASET_REGISTRY["image_mask"]
+            dataset = DATASET_REGISTRY["image_mask"]
             val_dataset = dataset(
                 val_images, val_masks, test_transform, device=args.device
             )
@@ -99,9 +72,7 @@ if __name__ == "__main__":
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
-            # TODO
             segformer = MODEL_REGISTRY["segformer"]().to(args.device)
-
             dp_model = torch.nn.DataParallel(segformer)
             trainer = BinaryClassifierTrainer(
                 model=dp_model,
