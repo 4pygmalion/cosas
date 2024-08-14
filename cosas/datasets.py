@@ -151,16 +151,18 @@ class MultiScaleDataset(Dataset):
         transform: A.Compose | None = None,
         multiples: int = 10,
         image_size: Tuple[int, int] = (512, 512),
+        device: str = "cuda",
     ):
-        device = ("cuda",)
         self.images = images
         self.masks = masks
         self.transform = transform
-        self.device = device
         self.multiples = multiples
+        self.image_size = image_size
+        self.device = device
+
         self._pre_augmentation(multiples, image_size=image_size)
 
-    def _pre_augmentation(self, multiples: int = 1, image_size=(512, 512)):
+    def _pre_augmentation(self, multiples: int = 10, image_size=(512, 512)):
         """이미지, 마스크를 초기화시에 N배를 생성"""
 
         augmentor = A.RandomResizedCrop(image_size)
