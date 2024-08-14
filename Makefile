@@ -20,4 +20,4 @@ test_run:
 
 .PHONY: save
 save:
-	docker save cosas:test | gzip -c > cosas.test.tar.gz
+	docker save cosas:test -o cosas.test.tar.gz
