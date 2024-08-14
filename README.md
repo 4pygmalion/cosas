@@ -20,5 +20,5 @@ $ make test_run
 
 # 도커 이미지 저장
 ```bash
-$ make test_run
+$ make save
 ```
