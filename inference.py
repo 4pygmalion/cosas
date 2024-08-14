@@ -10,7 +10,7 @@ from albumentations.pytorch.transforms import ToTensorV2
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def read_image(path) -> List[np.ndarray]:
+def read_image(path) -> np.ndarray:
     image = SimpleITK.ReadImage(path)
     return SimpleITK.GetArrayFromImage(image)
 
@@ -30,28 +30,32 @@ def preprocess_image(image_array: np.ndarray, device: str):
     return transform(image=image_array)["image"].to(device).unsqueeze(0)
 
 
-def postprocess_image(image_array: np.ndarray, original_size):
+def postprocess_image(confidences: torch.Tensor, original_size):
     """[summary] postprocessing model result to original image format"""
 
-    transform = A.Compose(
-        [
-            A.Resize(*original_size),
-        ]
-    )
-    return transform(image=image_array)["image"]
+    if confidences.ndim != 4:
+        raise ValueError(f"confidences should be 4D tensor, got {confidences.ndim}D")
+
+    confidences_array: np.ndarray = confidences.cpu().numpy()[0]
+    confidences_array = np.squeeze(confidences_array, axis=0)
+    upsampled_confidences = A.Resize(*original_size)(image=confidences_array)["image"]
+
+    return (upsampled_confidences >= 0.5).astype(np.uint8)
 
 
 def write_image(path, result):
-    image = SimpleITK.GetImageFromArray(result)
-    SimpleITK.WriteImage(image, path, useCompression=False)
+    pred_mask = SimpleITK.GetImageFromArray(result)
+    SimpleITK.WriteImage(pred_mask, path, useCompression=False)
     return
 
 
 def main():
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
     input_dir = "/input/images/adenocarcinoma-image"
     output_dir = "/output/images/adenocarcinoma-mask"
+
     os.makedirs(output_dir, exist_ok=True)
 
     # 모델 load
@@ -65,13 +69,11 @@ def main():
                 try:
                     input_path = os.path.join(input_dir, filename)
                     raw_image = read_image(input_path)
-                    original_size = raw_image.shape[-2:]
+                    original_size = raw_image.shape[:2]
 
                     x: torch.Tensor = preprocess_image(raw_image, device)
-                    pred = model(x)
-                    pred_mask = pred["mask"].cpu().numpy()[0]
-
-                    result = postprocess_image(pred_mask, original_size=original_size)
+                    confidences: torch.Tensor = model(x)["mask"]
+                    result = postprocess_image(confidences, original_size=original_size)
                     write_image(output_path, result)
 
                 except Exception as error:
