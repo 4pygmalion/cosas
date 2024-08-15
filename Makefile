@@ -16,3 +16,8 @@ test_run:
 	-v $(shell pwd)/task2/input/domain1:/input \
 	-v $(shell pwd)/task2/output:/output \
 	cosas:test
+
+
+.PHONY: save
+save:
+	docker save cosas:test -o cosas.test.tar.gz

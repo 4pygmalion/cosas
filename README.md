@@ -17,3 +17,8 @@ $ make build MODEL_PATH="/vast/AI_team/mlflow_artifact/13/fe7522d516fa476fb55c00
 ```bash
 $ make test_run
 ```
+
+# 도커 이미지 저장
+```bash
+$ make save
+```
