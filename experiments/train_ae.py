@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
-from cosas.networks import MultiTaskAE, MultiTaskTransAE
+from cosas.networks import MultiTaskAE, StainMultiTaskAE
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import CopyTransform, GridElasticTransform
@@ -148,7 +148,7 @@ if __name__ == "__main__":
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
             if args.architecture != "TransUNet":
-                model = MultiTaskAE(
+                model = StainMultiTaskAE(
                     architecture=args.architecture,
                     encoder_name=args.encoder_name,
                     input_size=(args.input_size, args.input_size),
