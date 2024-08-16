@@ -236,13 +236,15 @@ class AELoss(torch.nn.Module):
         super(AELoss, self).__init__()
         self.mcc = MCCLosswithLogits()
         self.sparsity_loss = SparsityLoss()
+        self.iou_loss = IoULoss()
         self.use_sparisty_loss = use_sparisty_loss
         self.alpha = alpha
 
     def forward(self, recon_x, x, logits, targets, vector, desnity):
         mask_error = self.mcc(logits, targets)
+        iou = self.iou_loss(logits, targets)
         recon_error = torch.nn.functional.mse_loss(recon_x, x)
-        loss = mask_error + self.alpha * recon_error
+        loss = iou + mask_error + self.alpha * recon_error
 
         if self.use_sparisty_loss:
             sparisty_penalty = self.sparsity_loss(vector, desnity)
