@@ -56,6 +56,7 @@ class Metrics:
     spec: AverageMeter = None
     auroc: AverageMeter = None
     prauc: AverageMeter = None
+    cosas_score : AverageMeter = None
 
     def __post_init__(self):
         self.f1 = AverageMeter("f1")
@@ -64,6 +65,7 @@ class Metrics:
         self.spec = AverageMeter("spec")
         self.auroc = AverageMeter("auroc")
         self.prauc = AverageMeter("prauc")
+        self.cosas_score = AverageMeter("cosas_score")
 
     def update(self, metrics: Dict[str, float], n: int = 1):
         for key, value in metrics.items():
@@ -164,6 +166,7 @@ def calculate_metrics(
         "prauc": prauc,
         "iou": iou,
         "dice": dice,
+        "cosas_score": (iou + dice) / 2
     }
 
 
