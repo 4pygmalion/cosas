@@ -153,12 +153,7 @@ if __name__ == "__main__":
                     encoder_name=args.encoder_name,
                     input_size=(args.input_size, args.input_size),
                 ).to(args.device)
-            else:
-                model = MultiTaskTransAE(
-                    architecture=args.architecture,
-                    encoder_name="vit",
-                    input_size=(args.input_size, args.input_size),
-                ).to(args.device)
+
 
             dp_model = torch.nn.DataParallel(model)
             trainer = AETrainer(

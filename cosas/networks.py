@@ -488,7 +488,7 @@ class MultiTaskAE(torch.nn.Module):
 class StainMultiTaskAE(torch.nn.Module):
     """Stain vector * density """
     def __init__(self, architecture: str, encoder_name, input_size=(224, 224)):
-        super(MultiTaskAE, self).__init__()
+        super(StainMultiTaskAE, self).__init__()
 
         self.encoder_name = encoder_name
         self.input_size = input_size
