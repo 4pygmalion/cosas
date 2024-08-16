@@ -94,7 +94,9 @@ if __name__ == "__main__":
                 model=dp_model,
                 loss=LOSS_REGISTRY[args.loss](),
                 optimizer=optimizer,
-                scheduler=CosineAnnealingWarmUpRestarts(optimizer, T_0=150, gamma=0.5),
+                scheduler=CosineAnnealingWarmUpRestarts(
+                    optimizer, T_0=150, gamma=0.8, eta_max=1e-5
+                ),
                 device=args.device,
             )
 
