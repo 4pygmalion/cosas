@@ -211,7 +211,7 @@ class BinaryClassifierTrainer(ABC):
     ):
 
         best_state_dict = deepcopy(self.model.state_dict())
-        best_score = -math.inf
+        best_loss = -math.inf
         for epoch in range(epochs):
             train_loss, train_metrics = self.run_epoch(
                 dataloader=train_dataloader, epoch=epoch, phase="train"
@@ -224,10 +224,10 @@ class BinaryClassifierTrainer(ABC):
             )
             mlflow.log_metric("val_loss", val_loss.avg, step=epoch)
             mlflow.log_metrics(val_metrics.to_dict(prefix="val_"), step=epoch)
-            
-            val_cosas_score = val_metrics.cosas_score.avg
-            if val_cosas_score >= best_score:
-                best_score = val_cosas_score
+
+            val_loss = val_loss.avg
+            if val_loss <= best_loss:
+                best_loss = val_loss
                 patience = 0
                 best_state_dict = deepcopy(self.model.state_dict())
             else:
