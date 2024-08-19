@@ -211,7 +211,7 @@ class BinaryClassifierTrainer(ABC):
     ):
 
         best_state_dict = deepcopy(self.model.state_dict())
-        best_loss = -math.inf
+        best_loss = math.inf
         patience = 0
         for epoch in range(epochs):
             train_loss, train_metrics = self.run_epoch(
