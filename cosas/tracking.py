@@ -24,6 +24,24 @@ def get_experiment(experiment_name=EXP_NAME):
     return experiment
 
 
+def get_child_run_ids(parent_run_id):
+    # Initialize an empty list to store child run IDs
+    child_run_ids = []
+
+    # Search for all runs in the experiment
+    experiment_id = mlflow.get_run(parent_run_id).info.experiment_id
+    all_runs = mlflow.search_runs(
+        experiment_ids=[experiment_id],
+        filter_string=f'tags.mlflow.parentRunId = "{parent_run_id}"',
+    )
+
+    # Collect the child run IDs
+    for run in all_runs.iterrows():
+        child_run_ids.append(run[1].run_id)
+
+    return child_run_ids
+
+
 def plot_and_save(
     image_name: str,
     original_x: np.ndarray,
