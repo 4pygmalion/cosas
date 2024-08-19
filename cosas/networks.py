@@ -456,9 +456,6 @@ class MultiTaskAE(torch.nn.Module):
              - vector (torch.Tensor): stain vectors (float32)
              - density (torch.Tensor): stain density (float32)
         """
-
-        x = rgb_to_od(x)
-
         z = self.architecture.encoder(x)
 
         # Stain vectors (B, 2, 3, W, H)
@@ -471,7 +468,6 @@ class MultiTaskAE(torch.nn.Module):
         stain_density = self.stain_den_head(x_d)
 
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
-        recon = od_to_rgb(recon)
 
         return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
 
