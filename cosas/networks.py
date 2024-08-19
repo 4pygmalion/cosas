@@ -426,7 +426,7 @@ class MultiTaskAE(torch.nn.Module):
     def __init__(self, architecture: str, encoder_name, input_size=(224, 224)):
         super(MultiTaskAE, self).__init__()
         self.architecture = getattr(smp, architecture)(
-            encoder_name=self.encoder_name, classes=6, activation="relu"
+            encoder_name=encoder_name, classes=6, activation="relu"
         )
         self.encoder_name = encoder_name
         self.input_size = input_size
