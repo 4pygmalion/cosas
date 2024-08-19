@@ -37,6 +37,10 @@ class ScannerData:
             mask = np.array(Image.open(mask_path))
             if mask.ndim == 3:
                 mask = mask[:, :, 0]  # dimension reduction (채널차원 동일값 중복)
+
+            if 255 in np.unique(mask):
+                mask = np.where(mask == 255, 1, mask)
+
             self.masks.append(mask)
 
         return self
