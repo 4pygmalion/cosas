@@ -103,10 +103,7 @@ class COSASData:
 
     def __post_init__(self):
         task_data_dir = os.path.join(self.data_dir, f"task{self.task}")
-        if self.task == 1:
-            self.domains = Organs
-        else:
-            self.domains = Scanncers
+        self.domains = Organs if self.task == 1 else Scanncers
 
         for domain in self.domains:
             subdir = os.path.join(task_data_dir, domain.value)
@@ -115,20 +112,20 @@ class COSASData:
         return
 
     def __repr__(self):
-        repr = f"""COSASData(\n  data_dir={self.data_dir},\n"""
+        output = f"""COSASData(\n  data_dir={self.data_dir},\n"""
 
         n_images = 0
-        repr_containers = list()
+        output = list()
         for domain in self.domains:
             scanner_data = getattr(self, domain.name)
             n_images += len(scanner_data)
-            repr_containers.append("  " + domain.name + "=" + scanner_data.__repr__())
+            output.append(f"  {domain.name} = {scanner_data.__repr__()}")
 
-        repr += "\n".join(repr_containers) + "\n"
-        repr += f"  image(n={n_images})\n"
-        repr += ")"
+        output += "\n".join(output) + "\n"
+        output += f"  image(n={n_images})\n"
+        output += ")"
 
-        return repr
+        return output
 
     def load(self):
         for domain in self.domains:
