@@ -62,14 +62,32 @@ class Scanncers(Enum):
     teksqray = "teksqray-600p"
 
 
+class Organs(Enum):
+    colorectum = "colorectum"
+    pancreas = "pancreas"
+    stomach = "stomach"
+
+
 @dataclass
 class COSASData:
     data_dir: str
+    task: int = 2
 
     def __post_init__(self):
-        for scanner in Scanncers:
-            scanner_dir = os.path.join(self.data_dir, scanner.value)
-            setattr(self, scanner.name, ScannerData(scanner_dir))
+        task_data_dir = os.path.join(self.data_dir, f"task{self.task}")
+        self._set_domains()
+
+        for domain in self.domains:
+            subdir = os.path.join(task_data_dir, domain.value)
+            setattr(self, domain.name, ScannerData(subdir))
+
+        return
+
+    def _set_domains(self):
+        if self.task == 1:
+            self.domains = Organs
+        else:
+            self.domains = Scanncers
 
         return
 
@@ -77,38 +95,38 @@ class COSASData:
         repr = f"""COSASData(\n  data_dir={self.data_dir},\n"""
 
         n_images = 0
-        scanner_repr = list()
-        for scanner in Scanncers:
-            scanner_data = getattr(self, scanner.name)
+        repr_containers = list()
+        for domain in self.domains:
+            scanner_data = getattr(self, domain.name)
             n_images += len(scanner_data)
-            scanner_repr.append("  " + scanner.name + "=" + scanner_data.__repr__())
+            repr_containers.append("  " + domain.name + "=" + scanner_data.__repr__())
 
-        repr += "\n".join(scanner_repr) + "\n"
+        repr += "\n".join(repr_containers) + "\n"
         repr += f"  image(n={n_images})\n"
         repr += ")"
 
         return repr
 
     def load(self):
-        for scanner in Scanncers:
-            getattr(self, scanner.name).load()
+        for domain in self.domains:
+            getattr(self, domain.name).load()
 
         return self
 
     @property
     def images(self) -> List[np.ndarray]:
         images = list()
-        for scanner in Scanncers:
-            scanner_data: ScannerData = getattr(self, scanner.name)
-            images.extend(scanner_data.images)
+        for domain in self.domains:
+            domain_data: ScannerData = getattr(self, domain.name)
+            images.extend(domain_data.images)
 
         return images
 
     @property
     def masks(self) -> List[np.ndarray]:
         masks = list()
-        for scanner in Scanncers:
-            scanner_data: ScannerData = getattr(self, scanner.name)
-            masks.extend(scanner_data.masks)
+        for domain in self.domains:
+            domain_data: ScannerData = getattr(self, domain.name)
+            masks.extend(domain_data.masks)
 
         return masks
