@@ -115,13 +115,13 @@ class COSASData:
         output = f"""COSASData(\n  data_dir={self.data_dir},\n"""
 
         n_images = 0
-        output = list()
+        subdata_repr = list()
         for domain in self.domains:
             scanner_data = getattr(self, domain.name)
             n_images += len(scanner_data)
-            output.append(f"  {domain.name} = {scanner_data.__repr__()}")
+            subdata_repr.append(f"  {domain.name} = {scanner_data.__repr__()}")
 
-        output += "\n".join(output) + "\n"
+        output += "\n".join(subdata_repr) + "\n"
         output += f"  image(n={n_images})\n"
         output += ")"
 
