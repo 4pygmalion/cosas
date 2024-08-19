@@ -34,7 +34,10 @@ class ScannerData:
             self.images.append(np.array(Image.open(image_path)))
 
         for mask_path in sorted(self.mask_paths):
-            self.masks.append(np.array(Image.open(mask_path)))
+            mask = np.array(Image.open(mask_path))
+            if mask.ndim == 3:
+                mask = mask[:, :, 0]  # dimension reduction (채널차원 동일값 중복)
+            self.masks.append(mask)
 
         return self
 
