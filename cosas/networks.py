@@ -426,7 +426,7 @@ class MultiTaskAE(torch.nn.Module):
     def __init__(self, architecture: str, encoder_name, input_size=(224, 224)):
         super(MultiTaskAE, self).__init__()
         self.architecture = getattr(smp, architecture)(
-            encoder_name=encoder_name, classes=6, activation="relu"
+            encoder_name=encoder_name, classes=6, activation=torch.nn.ReLU
         )
         self.encoder_name = encoder_name
         self.input_size = input_size
@@ -439,7 +439,7 @@ class MultiTaskAE(torch.nn.Module):
             decoder_channels=(256, 128, 64, 32, 2),
         )
         self.stain_den_head = SegmentationHead(
-            in_channels=2, out_channels=2, activation="relu"
+            in_channels=2, out_channels=2, activation=torch.nn.ReLU
         )
         self.mask_head = SegmentationHead(
             in_channels=8, out_channels=1, activation=None
