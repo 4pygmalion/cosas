@@ -7,7 +7,7 @@ from efficientnet_pytorch.utils import Conv2dStaticSamePadding
 from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
 from segmentation_models_pytorch.base.heads import SegmentationHead
 
-from cosas.transforms import tesellation, reverse_tesellation
+from .transforms import tesellation, reverse_tesellation, od_to_rgb, rgb_to_od
 
 
 class PyramidSeg(torch.nn.Module):
@@ -425,12 +425,11 @@ class TransUNet(nn.Module):
 class MultiTaskAE(torch.nn.Module):
     def __init__(self, architecture: str, encoder_name, input_size=(224, 224)):
         super(MultiTaskAE, self).__init__()
-
+        self.architecture = getattr(smp, architecture)(
+            encoder_name=self.encoder_name, classes=6, activation="relu"
+        )
         self.encoder_name = encoder_name
         self.input_size = input_size
-        self.architecture = getattr(smp, architecture)(
-            encoder_name=self.encoder_name, classes=6
-        )
 
         self.stain_vec_head = self.architecture.segmentation_head
 
@@ -440,13 +439,26 @@ class MultiTaskAE(torch.nn.Module):
             decoder_channels=(256, 128, 64, 32, 2),
         )
         self.stain_den_head = SegmentationHead(
-            in_channels=2, out_channels=2, activation=None
+            in_channels=2, out_channels=2, activation="relu"
         )
         self.mask_head = SegmentationHead(
             in_channels=8, out_channels=1, activation=None
         )
 
     def reconstruction(self, x):
+        """
+        Args:
+            x (torch.Tensor): torch tensor image (float32)
+
+        return
+            dict:
+             - recon (torch.Tensor): reconstructed image (float32)
+             - vector (torch.Tensor): stain vectors (float32)
+             - density (torch.Tensor): stain density (float32)
+        """
+
+        x = rgb_to_od(x)
+
         z = self.architecture.encoder(x)
 
         # Stain vectors (B, 2, 3, W, H)
@@ -459,84 +471,17 @@ class MultiTaskAE(torch.nn.Module):
         stain_density = self.stain_den_head(x_d)
 
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
-        recon = torch.clip(recon, -1, 1)
+        recon = od_to_rgb(recon)
 
         return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
 
-    def forward(self, x):
-        w, h = x.shape[-2:]
+    def forward(self, x: torch.Tensor):
+        """
+        Args:
+            x (torch.Tensor): torch tensor image (float32)
 
-        output = self.reconstruction(x)
-        recon = output["recon"]
-        vector = output["vector"]
-        density = output["denisty"]
+        """
 
-        batch_size = x.shape[0]
-        stain_info = torch.concat(
-            [vector.view(batch_size, -1, w, h), density.view(batch_size, -1, w, h)],
-            axis=1,
-        )
-
-        return {
-            "recon": recon,
-            "mask": self.mask_head(stain_info),
-            "vector": output["vector"],
-            "density": output["denisty"],
-        }
-
-
-class MultiTaskTransAE(torch.nn.Module):
-    def __init__(
-        self,
-        architecture: str,
-        encoder_name,
-        input_size=(224, 224),
-        in_channels=3,
-        out_channels=128,
-        head_num=4,
-        mlp_dim=512,
-        block_num=8,
-        patch_dim=16,
-    ):
-        super(MultiTaskTransAE, self).__init__()
-
-        img_dim = input_size[0]
-        self.encoder = Encoder(
-            img_dim,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            head_num=head_num,
-            mlp_dim=mlp_dim,
-            block_num=block_num,
-            patch_dim=patch_dim,
-        )
-        self.decoder = Decoder(out_channels=out_channels, class_num=6)
-        self.stain_app = Decoder(out_channels=out_channels, class_num=2)
-        self.input_size = input_size
-        self.segmentation_head = SegmentationHead(
-            in_channels=6, out_channels=6, activation=None
-        )
-        self.mask_head = SegmentationHead(
-            in_channels=8, out_channels=1, activation=None
-        )
-
-    def reconstruction(self, x):
-        z = self.encoder(x)
-
-        # Stain vectors (B, 2, 3, W, H)
-        x = self.decoder(*z)  # (6, W, H)
-        x = self.segmentation_head(x)  # (B, 6, W, H)
-        stain_vectors = x.view(-1, 2, 3, *self.input_size)  # (B, 2, 3, W, H)
-
-        # Stain Density (B, 2, W, H)
-        stain_density = self.stain_app(*z)  # (B, 2, W, H)
-
-        recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
-        recon = torch.clip(recon, -1, 1)
-
-        return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
-
-    def forward(self, x):
         w, h = x.shape[-2:]
 
         output = self.reconstruction(x)

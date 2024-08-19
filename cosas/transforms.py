@@ -379,3 +379,23 @@ class GridElasticTransform(A.DualTransform):
 
     def get_transform_init_args_names(self):
         return ("n_grid_width", "n_grid_height", "magnitude")
+
+
+def rgb_to_od(rgb_tensor: torch.Tensor, max_intensity: float = 1) -> torch.Tensor:
+    """RGB spcae to OD space
+
+    Args:
+        rgb_array (torch.Tensor): float type RGB tensor
+        max_intensity (int, optional): I0. Defaults to 1.
+
+    Returns:
+        torch.Tensor
+    """
+
+    clip = torch.clip(rgb_tensor, 1e-5, max_intensity)
+    return -torch.log10(clip / max_intensity)
+
+
+def od_to_rgb(od_tensor: torch.Tensor) -> torch.Tensor:
+    tensor = torch.exp(-od_tensor)
+    return (tensor * 255).astype(torch.float32)
