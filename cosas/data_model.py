@@ -62,53 +62,91 @@ class Scanncers(Enum):
     teksqray = "teksqray-600p"
 
 
+class Organs(Enum):
+    colorectum = "colorectum"
+    pancreas = "pancreas"
+    stomach = "stomach"
+
+
 @dataclass
 class COSASData:
+    """COSAS dataset
+
+    Example:
+        >>> from cosas.data_model import COSASData
+        >>> from cosas.paths import DATA_DIR
+        >>> cosas_task1 = COSASData(DATA_DIR, task=1)
+        >>> cosas_task1.load()
+        >>> print(cosas_task1)
+        COSASData(
+            data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet,
+            colorectum=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task1/colorectum, N images=60, N mask=60
+            pancreas=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task1/pancreas, N images=60, N mask=60
+            stomach=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task1/stomach, N images=60, N mask=60
+            image(n=180)
+        )
+
+        >>> cosas_task2 = COSASData(DATA_DIR, task=2)
+        >>> cosas_task2.load()
+        >>> print(cosas_task2)
+        COSASData(
+            data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet,
+            kfbio=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task2/kfbio-400, N images=60, N mask=60
+            ddd=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task2/3d-1000, N images=60, N mask=60
+            teksqray=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task2/teksqray-600p, N images=60, N mask=60
+            image(n=180)
+        )
+    """
+
     data_dir: str
+    task: int = 2
 
     def __post_init__(self):
-        for scanner in Scanncers:
-            scanner_dir = os.path.join(self.data_dir, scanner.value)
-            setattr(self, scanner.name, ScannerData(scanner_dir))
+        task_data_dir = os.path.join(self.data_dir, f"task{self.task}")
+        self.domains = Organs if self.task == 1 else Scanncers
+
+        for domain in self.domains:
+            subdir = os.path.join(task_data_dir, domain.value)
+            setattr(self, domain.name, ScannerData(subdir))
 
         return
 
     def __repr__(self):
-        repr = f"""COSASData(\n  data_dir={self.data_dir},\n"""
+        output = f"""COSASData(\n  data_dir={self.data_dir},\n"""
 
         n_images = 0
-        scanner_repr = list()
-        for scanner in Scanncers:
-            scanner_data = getattr(self, scanner.name)
+        output = list()
+        for domain in self.domains:
+            scanner_data = getattr(self, domain.name)
             n_images += len(scanner_data)
-            scanner_repr.append("  " + scanner.name + "=" + scanner_data.__repr__())
+            output.append(f"  {domain.name} = {scanner_data.__repr__()}")
 
-        repr += "\n".join(scanner_repr) + "\n"
-        repr += f"  image(n={n_images})\n"
-        repr += ")"
+        output += "\n".join(output) + "\n"
+        output += f"  image(n={n_images})\n"
+        output += ")"
 
-        return repr
+        return output
 
     def load(self):
-        for scanner in Scanncers:
-            getattr(self, scanner.name).load()
+        for domain in self.domains:
+            getattr(self, domain.name).load()
 
         return self
 
     @property
     def images(self) -> List[np.ndarray]:
         images = list()
-        for scanner in Scanncers:
-            scanner_data: ScannerData = getattr(self, scanner.name)
-            images.extend(scanner_data.images)
+        for domain in self.domains:
+            domain_data: ScannerData = getattr(self, domain.name)
+            images.extend(domain_data.images)
 
         return images
 
     @property
     def masks(self) -> List[np.ndarray]:
         masks = list()
-        for scanner in Scanncers:
-            scanner_data: ScannerData = getattr(self, scanner.name)
-            masks.extend(scanner_data.masks)
+        for domain in self.domains:
+            domain_data: ScannerData = getattr(self, domain.name)
+            masks.extend(domain_data.masks)
 
         return masks

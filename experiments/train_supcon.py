@@ -111,7 +111,7 @@ n_hiddens = {"efficientnet-b7": 640, "efficientnet-b3": 384, "efficientnet-b1": 
 
 
 def main(args):
-    cosas_data = COSASData(os.path.join(DATA_DIR, "task2"))
+    cosas_data = COSASData(DATA_DIR, task=2)
     cosas_data.load()
 
     mlflow.set_tracking_uri(TRACKING_URI)
