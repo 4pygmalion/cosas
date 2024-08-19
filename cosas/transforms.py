@@ -398,4 +398,4 @@ def rgb_to_od(rgb_tensor: torch.Tensor, max_intensity: float = 1) -> torch.Tenso
 
 def od_to_rgb(od_tensor: torch.Tensor) -> torch.Tensor:
     tensor = torch.exp(-od_tensor)
-    return (tensor * 255).astype(torch.float32)
+    return (tensor * 255).float()
