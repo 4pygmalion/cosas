@@ -70,24 +70,47 @@ class Organs(Enum):
 
 @dataclass
 class COSASData:
+    """COSAS dataset
+
+    Example:
+        >>> from cosas.data_model import COSASData
+        >>> from cosas.paths import DATA_DIR
+        >>> cosas_task1 = COSASData(DATA_DIR, task=1)
+        >>> cosas_task1.load()
+        >>> print(cosas_task1)
+        COSASData(
+            data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet,
+            colorectum=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task1/colorectum, N images=60, N mask=60
+            pancreas=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task1/pancreas, N images=60, N mask=60
+            stomach=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task1/stomach, N images=60, N mask=60
+            image(n=180)
+        )
+
+        >>> cosas_task2 = COSASData(DATA_DIR, task=2)
+        >>> cosas_task2.load()
+        >>> print(cosas_task2)
+        COSASData(
+            data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet,
+            kfbio=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task2/kfbio-400, N images=60, N mask=60
+            ddd=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task2/3d-1000, N images=60, N mask=60
+            teksqray=ScannerData(data_dir=/vast/AI_team/dataset/COSAS24-TrainingSet/task2/teksqray-600p, N images=60, N mask=60
+            image(n=180)
+        )
+    """
+
     data_dir: str
     task: int = 2
 
     def __post_init__(self):
         task_data_dir = os.path.join(self.data_dir, f"task{self.task}")
-        self._set_domains()
-
-        for domain in self.domains:
-            subdir = os.path.join(task_data_dir, domain.value)
-            setattr(self, domain.name, ScannerData(subdir))
-
-        return
-
-    def _set_domains(self):
         if self.task == 1:
             self.domains = Organs
         else:
             self.domains = Scanncers
+
+        for domain in self.domains:
+            subdir = os.path.join(task_data_dir, domain.value)
+            setattr(self, domain.name, ScannerData(subdir))
 
         return
 
