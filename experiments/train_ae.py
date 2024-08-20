@@ -82,7 +82,6 @@ def get_transforms(input_size):
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
-            GridElasticTransform(n_grid_height=8, n_grid_width=8, magnitude=4, p=0.7),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             CopyTransform(p=1),
             ToTensorV2(),
@@ -119,7 +118,7 @@ if __name__ == "__main__":
     ) as run:
         folds = KFold(n_splits=5, shuffle=True, random_state=42)
         mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"))
-        
+
         for fold, (train_val_indices, test_indices) in enumerate(
             folds.split(cosas_data2.images, cosas_data2.masks), start=1
         ):
