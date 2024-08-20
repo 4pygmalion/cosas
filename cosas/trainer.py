@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 import mlflow
 import torch
 import numpy as np
+from torch.optim.lr_scheduler import _LRScheduler
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToPILImage
 from progress.bar import Bar
@@ -42,13 +43,15 @@ class BinaryClassifierTrainer(ABC):
         self,
         model: torch.nn.modules.Module,
         loss: torch.nn.modules.loss._Loss,
-        device: str = "cuda",
         optimizer: torch.optim.Optimizer = None,
+        scheduler: torch.optim.lr_scheduler._LRScheduler = None,
+        device: str = "cuda",
         logger: logging.Logger = None,
     ):
         self.model = model
         self.loss = loss
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.device = device
         self.logger = (
             logging.Logger("BinaryClassifierTrainer") if logger is None else logger
@@ -253,7 +256,6 @@ class SSLTrainer(ABC):
         self,
         model: torch.nn.modules.Module,
         loss: torch.nn.modules.loss._Loss,
-        device: str = "cuda",
         optimizer: torch.optim.Optimizer = None,
         logger: logging.Logger = None,
     ):
@@ -402,15 +404,14 @@ class AETrainer(BinaryClassifierTrainer):
         self,
         model: torch.nn.modules.Module,
         loss: torch.nn.modules.loss._Loss,
-        device: str = "cuda",
         optimizer: torch.optim.Optimizer = None,
+        scheduler: torch.optim.lr_scheduler._LRScheduler = None,
+        device: str = "cuda",
         logger: logging.Logger = None,
     ):
-        self.model = model
-        self.loss = loss
-        self.optimizer = optimizer
-        self.device = device
-        self.logger = logging.Logger("AutoEncoderTrainer") if logger is None else logger
+        super(AETrainer, self).__init__(
+            model, loss, optimizer, scheduler, device, logger
+        )
 
     def run_epoch(
         self,
@@ -447,13 +448,6 @@ class AETrainer(BinaryClassifierTrainer):
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-        scheduler = torch.optim.lr_scheduler.CyclicLR(
-            self.optimizer,
-            base_lr=0.001,
-            max_lr=0.1,
-            step_size_up=int(len(dataloader)) * 4,
-            step_size_down=int(len(dataloader)) * 4,
-        )
         i = 0
         for step, batch in enumerate(dataloader):
             xs, ys = batch
@@ -473,7 +467,8 @@ class AETrainer(BinaryClassifierTrainer):
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                scheduler.step()
+                if self.scheduler:
+                    self.scheduler.step()
 
             else:
                 with torch.no_grad():
@@ -543,3 +538,80 @@ class AETrainer(BinaryClassifierTrainer):
         bar.finish()
 
         return (loss_meter, epoch_metrics)
+
+
+class CosineAnnealingWarmUpRestarts(_LRScheduler):
+    def __init__(
+        self, optimizer, T_0, T_mult=1, eta_max=0.1, T_up=0, gamma=1.0, last_epoch=-1
+    ):
+        if T_0 <= 0 or not isinstance(T_0, int):
+            raise ValueError("Expected positive integer T_0, but got {}".format(T_0))
+        if T_mult < 1 or not isinstance(T_mult, int):
+            raise ValueError("Expected integer T_mult >= 1, but got {}".format(T_mult))
+        if T_up < 0 or not isinstance(T_up, int):
+            raise ValueError("Expected positive integer T_up, but got {}".format(T_up))
+        self.T_0 = T_0
+        self.T_mult = T_mult
+        self.base_eta_max = eta_max
+        self.eta_max = eta_max
+        self.T_up = T_up
+        self.T_i = T_0
+        self.gamma = gamma
+        self.cycle = 0
+        self.T_cur = last_epoch
+        super(CosineAnnealingWarmUpRestarts, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        if self.T_cur == -1:
+            return self.base_lrs
+        elif self.T_cur < self.T_up:
+            return [
+                (self.eta_max - base_lr) * self.T_cur / self.T_up + base_lr
+                for base_lr in self.base_lrs
+            ]
+        else:
+            return [
+                base_lr
+                + (self.eta_max - base_lr)
+                * (
+                    1
+                    + math.cos(
+                        math.pi * (self.T_cur - self.T_up) / (self.T_i - self.T_up)
+                    )
+                )
+                / 2
+                for base_lr in self.base_lrs
+            ]
+
+    def step(self, epoch=None):
+        if epoch is None:
+            epoch = self.last_epoch + 1
+            self.T_cur = self.T_cur + 1
+            if self.T_cur >= self.T_i:
+                self.cycle += 1
+                self.T_cur = self.T_cur - self.T_i
+                self.T_i = (self.T_i - self.T_up) * self.T_mult + self.T_up
+        else:
+            if epoch >= self.T_0:
+                if self.T_mult == 1:
+                    self.T_cur = epoch % self.T_0
+                    self.cycle = epoch // self.T_0
+                else:
+                    n = int(
+                        math.log(
+                            (epoch / self.T_0 * (self.T_mult - 1) + 1), self.T_mult
+                        )
+                    )
+                    self.cycle = n
+                    self.T_cur = epoch - self.T_0 * (self.T_mult**n - 1) / (
+                        self.T_mult - 1
+                    )
+                    self.T_i = self.T_0 * self.T_mult ** (n)
+            else:
+                self.T_i = self.T_0
+                self.T_cur = epoch
+
+        self.eta_max = self.base_eta_max * (self.gamma**self.cycle)
+        self.last_epoch = math.floor(epoch)
+        for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
+            param_group["lr"] = lr

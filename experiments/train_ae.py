@@ -16,7 +16,7 @@ from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import CopyTransform, GridElasticTransform
 from cosas.losses import AELoss
 from cosas.misc import set_seed, get_config
-from cosas.trainer import AETrainer
+from cosas.trainer import AETrainer, CosineAnnealingWarmUpRestarts
 from cosas.tracking import TRACKING_URI, get_experiment
 from cosas.metrics import summarize_metrics
 
@@ -170,10 +170,15 @@ if __name__ == "__main__":
                 ).to(args.device)
 
             dp_model = torch.nn.DataParallel(model)
+            optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+            scheduler = CosineAnnealingWarmUpRestarts(
+                optimizer, T_0=100, T_mult=1, eta_max=0.001, T_up=10, gamma=0.5
+            )
             trainer = AETrainer(
                 model=dp_model,
                 loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
-                optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+                optimizer=optimizer,
+                scheduler=scheduler,
                 device=args.device,
             )
 
