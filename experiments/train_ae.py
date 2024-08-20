@@ -13,7 +13,7 @@ from cosas.paths import DATA_DIR
 from cosas.networks import MultiTaskAE, MultiTaskTransAE
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
-from cosas.transforms import CopyTransform, GridElasticTransform
+from cosas.transforms import CopyTransform, GridElasticTransform, RandomPointsLiquify
 from cosas.losses import AELoss
 from cosas.misc import set_seed, get_config
 from cosas.trainer import AETrainer
@@ -82,6 +82,7 @@ def get_transforms(input_size):
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
+            RandomPointsLiquify(n_points=4, strenght=3, radius=7, p=0.5),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             CopyTransform(p=1),
             ToTensorV2(),
