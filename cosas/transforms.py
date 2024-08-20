@@ -2,6 +2,7 @@ import random
 import math
 from typing import Tuple, List, Dict, Any
 
+import cv2
 import numpy as np
 import torch
 import albumentations as A
@@ -379,3 +380,66 @@ class GridElasticTransform(A.DualTransform):
 
     def get_transform_init_args_names(self):
         return ("n_grid_width", "n_grid_height", "magnitude")
+
+
+class RandomPointsLiquify(A.DualTransform):
+    def __init__(
+        self,
+        n_points: int = 5,
+        strenght: int = 5,
+        radius: int = 5,
+        p: float = 1.0,
+        always_apply: bool | None = None,
+    ):
+        super().__init__(p=p, always_apply=always_apply)
+        self.n_points = n_points
+        self.strenght = strenght
+        self.radius = radius
+
+    def generate_random_target_points(self, image: np.ndarray) -> np.ndarray:
+        w, h = image.shape[:2]
+        x_points = np.random.randint(0, w, size=self.n_points)
+        y_points = np.random.randint(0, h, size=self.n_points)
+
+        return np.stack([x_points, y_points], axis=1)
+
+    def generate_mesh(self, image: np.ndarray, target_points: np.ndarray):
+        h, w = image.shape[:2]
+        map_x, map_y = np.meshgrid(np.arange(w), np.arange(h))
+        for target_point in target_points:
+            target_point_x, target_point_y = target_point
+
+            displacement_x = (map_x - target_point_x) / self.radius
+            displacement_y = (map_y - target_point_y) / self.radius
+            distance = np.sqrt(displacement_x**2 + displacement_y**2)
+
+            mask = np.exp(-distance / self.radius) * self.strenght
+            new_x = map_x - displacement_x * mask
+            new_y = map_y - displacement_y * mask
+
+            map_x = np.clip(new_x, 0, w - 1).astype(np.float32)
+            map_y = np.clip(new_y, 0, h - 1).astype(np.float32)
+
+        return (map_x, map_y)
+
+    def get_params_dependent_on_data(
+        self, params: Dict[str, Any], data: dict[str, Any]
+    ) -> Dict[str, Any]:
+
+        image = data["image"]
+        h, w = image.shape[:2]
+
+        target_points = self.generate_random_target_points(image)
+        transform_mesh = self.generate_mesh(image, target_points)
+
+        return {"transform_mesh": transform_mesh}
+
+    def distort_image(self, img, transform_mesh):
+        map_x, map_y = transform_mesh
+        return cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
+
+    def apply(self, img, transform_mesh, **params):
+        return self.distort_image(img, transform_mesh)
+
+    def apply_to_mask(self, mask, transform_mesh, **params):
+        return self.distort_image(mask, transform_mesh)
