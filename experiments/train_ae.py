@@ -118,6 +118,8 @@ if __name__ == "__main__":
         experiment_id=experiment.experiment_id, run_name=args.run_name
     ) as run:
         folds = KFold(n_splits=5, shuffle=True, random_state=42)
+        mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"))
+        
         for fold, (train_val_indices, test_indices) in enumerate(
             folds.split(cosas_data2.images, cosas_data2.masks), start=1
         ):
