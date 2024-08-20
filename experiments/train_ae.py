@@ -82,7 +82,6 @@ def get_transforms(input_size):
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
-            GridElasticTransform(n_grid_height=8, n_grid_width=8, magnitude=4, p=0.7),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             CopyTransform(p=1),
             ToTensorV2(),
