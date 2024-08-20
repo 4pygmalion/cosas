@@ -171,7 +171,7 @@ if __name__ == "__main__":
             dp_model = torch.nn.DataParallel(model)
             optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
             scheduler = CosineAnnealingWarmUpRestarts(
-                optimizer, T_0=100, T_mult=1, eta_max=0.001, T_up=10, gamma=0.5
+                optimizer, T_0=50, T_mult=1, eta_max=0.001, T_up=10, gamma=0.5
             )
             trainer = AETrainer(
                 model=dp_model,
