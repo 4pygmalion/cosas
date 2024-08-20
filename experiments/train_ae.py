@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.networks import MultiTaskAE, MultiTaskTransAE
-from cosas.data_model import COSASData
+from cosas.data_model import COSASData, COSASManualData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import CopyTransform, GridElasticTransform
 from cosas.losses import AELoss
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     cosas_data2.load()
 
     if args.use_task1:
-        cosas_data1 = COSASData(DATA_DIR, task=1)
+        cosas_data1 = COSASManualData(DATA_DIR)
         cosas_data1.load()
 
     mlflow.set_tracking_uri(TRACKING_URI)
