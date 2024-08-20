@@ -162,6 +162,7 @@ def get_args():
 
 def tta_softvoting(n_trials: List[Dict[str, torch.Tensor]]):
     """한 데이터포인트(=instance)에 대한 TTA 진행후 tensor"""
+
     res = defaultdict(list)
     for trial in n_trials:
         for k, v in trial.items():
@@ -172,6 +173,7 @@ def tta_softvoting(n_trials: List[Dict[str, torch.Tensor]]):
 @torch.no_grad()
 def rotational_tta(xs, model):
     """배치(xs)에 대해서 TTA을 진행"""
+
     y_hats = []
     for x in xs:
         outputs = []
