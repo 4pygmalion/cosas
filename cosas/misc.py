@@ -1,5 +1,6 @@
 import argparse
-from typing import Tuple
+from typing import Tuple, Dict, List
+from collections import defaultdict
 
 import random
 import numpy as np
@@ -7,6 +8,7 @@ import torch
 from torchvision.transforms import ToPILImage
 from matplotlib import pyplot as plt
 from sklearn.model_selection import train_test_split
+from torchvision.transforms.functional import rotate
 
 from .data_model import COSASData, Scanncers
 from .transforms import remove_pad, reverse_tesellation
@@ -196,3 +198,33 @@ def plot_xypred(
     plt.tight_layout()
 
     return fig, axes
+
+
+def tta_softvoting(n_trials: List[Dict[str, torch.Tensor]]):
+    """한 데이터포인트(=instance)에 대한 TTA 진행후 tensor"""
+
+    res = defaultdict(list)
+    for trial in n_trials:
+        for k, v in trial.items():
+            res[k].append(v)
+    return {k: torch.stack(v, dim=0).mean(dim=0) for k, v in res.items()}
+
+
+@torch.no_grad()
+def rotational_tta(xs, model, angles=[0, 90, 180, 270]):
+    """배치(xs)에 대해서 TTA을 진행"""
+
+    y_hats = []
+    for x in xs:
+        outputs = []
+        for angle in angles:
+            x_new = rotate(x, angle=angle)
+            output = model(x_new.unsqueeze(0))
+            outputs.append(
+                {k: rotate(tensor.squeeze(0), -angle) for k, tensor in output.items()}
+            )
+        y_hats.append(tta_softvoting(outputs))
+
+    return {
+        k: torch.stack([y_hat[k] for y_hat in y_hats], dim=0) for k in y_hats[0].keys()
+    }

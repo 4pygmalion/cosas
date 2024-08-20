@@ -1,13 +1,11 @@
 import argparse
-from typing import Dict, List, Tuple
-from collections import defaultdict
+from typing import Tuple
 
 import numpy as np
 import mlflow
 import albumentations as A
 import torch
 from progress.bar import Bar
-from torchvision.transforms.functional import rotate
 from torchvision.transforms import ToPILImage
 from torch.utils.data import DataLoader
 from sklearn.model_selection import KFold
@@ -26,6 +24,7 @@ from cosas.tracking import (
 )
 from cosas.datasets import ImageMaskDataset
 from cosas.metrics import summarize_metrics
+from cosas.misc import rotational_tta
 
 
 MODEL_URI = "file:///vast/AI_team/mlflow_artifact/13/{run_id}/artifacts/model"
@@ -155,36 +154,6 @@ def get_args():
     parser.add_argument("-p", "--parent_id", type=str, required=True)
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     return parser.parse_args()
-
-
-def tta_softvoting(n_trials: List[Dict[str, torch.Tensor]]):
-    """한 데이터포인트(=instance)에 대한 TTA 진행후 tensor"""
-
-    res = defaultdict(list)
-    for trial in n_trials:
-        for k, v in trial.items():
-            res[k].append(v)
-    return {k: torch.stack(v, dim=0).mean(dim=0) for k, v in res.items()}
-
-
-@torch.no_grad()
-def rotational_tta(xs, model, angles=[0, 90, 180, 270]):
-    """배치(xs)에 대해서 TTA을 진행"""
-
-    y_hats = []
-    for x in xs:
-        outputs = []
-        for angle in angles:
-            x_new = rotate(x, angle=angle)
-            output = model(x_new.unsqueeze(0))
-            outputs.append(
-                {k: rotate(tensor.squeeze(0), -angle) for k, tensor in output.items()}
-            )
-        y_hats.append(tta_softvoting(outputs))
-
-    return {
-        k: torch.stack([y_hat[k] for y_hat in y_hats], dim=0) for k in y_hats[0].keys()
-    }
 
 
 def load_data(task: int = 2):
