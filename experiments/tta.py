@@ -81,10 +81,7 @@ class Evaluator(BinaryClassifierTrainer):
             xs = xs.to(self.device)
             ys = ys.to(self.device)
 
-            if tta:
-                outputs = tta(xs, self.model)
-            else:
-                outputs = self.model(xs)
+            outputs = tta(xs, self.model) if tta else self.model(xs)
 
             recon_x = outputs["recon"]
             logits = outputs["mask"]
@@ -171,13 +168,13 @@ def tta_softvoting(n_trials: List[Dict[str, torch.Tensor]]):
 
 
 @torch.no_grad()
-def rotational_tta(xs, model):
+def rotational_tta(xs, model, angles=[0, 90, 180, 270]):
     """배치(xs)에 대해서 TTA을 진행"""
 
     y_hats = []
     for x in xs:
         outputs = []
-        for angle in [0, 90, 180, 270]:
+        for angle in angles:
             x_new = rotate(x, angle=angle)
             output = model(x_new.unsqueeze(0))
             outputs.append(
