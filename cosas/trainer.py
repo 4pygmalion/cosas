@@ -229,13 +229,7 @@ class BinaryClassifierTrainer(ABC):
             val_loss = val_loss.avg
             if val_loss <= best_loss:
                 best_loss = val_loss
-                patience = 0
                 best_state_dict = deepcopy(self.model.state_dict())
-            else:
-                patience += 1
-                if patience >= n_patience:
-                    self.logger.info("Early stopping after epoch {}".format(epoch))
-                    break
 
         self.model.load_state_dict(best_state_dict)
         self.run_epoch(
