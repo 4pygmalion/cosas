@@ -1,5 +1,5 @@
 import os
-from typing import List
+import argparse
 
 import numpy as np
 import torch
@@ -7,7 +7,16 @@ import SimpleITK
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 
+from cosas.misc import rotational_tta
+
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry_run", action="store_true")
+
+    return parser.parse_args()
 
 
 def read_image(path) -> np.ndarray:
@@ -51,10 +60,15 @@ def write_image(path, result):
 
 def main():
 
+    args = get_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    input_dir = "/input/images/adenocarcinoma-image"
-    output_dir = "/output/images/adenocarcinoma-mask"
+    if args.dry_run:
+        input_dir = "task2/input/domain1/images/adenocarcinoma-image"
+        output_dir = "task2/output/images/adenocarcinoma-mask"
+    else:
+        input_dir = "/input/images/adenocarcinoma-image"
+        output_dir = "/output/images/adenocarcinoma-mask"
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -62,22 +76,22 @@ def main():
     model_path = os.path.join(CURRENT_DIR, "model.pth")
     model = torch.load(model_path).eval().to(device)
 
-    with torch.no_grad():
-        for filename in os.listdir(input_dir):
-            if filename.endswith(".mha"):
-                output_path = os.path.join(output_dir, filename)
-                try:
-                    input_path = os.path.join(input_dir, filename)
-                    raw_image = read_image(input_path)
-                    original_size = raw_image.shape[:2]
+    for filename in os.listdir(input_dir):
+        if filename.endswith(".mha"):
+            output_path = os.path.join(output_dir, filename)
+            input_path = os.path.join(input_dir, filename)
+            try:
+                raw_image = read_image(input_path)
+            except Exception as e:
+                print(e)
 
-                    x: torch.Tensor = preprocess_image(raw_image, device)
-                    confidences: torch.Tensor = model(x)["mask"]
-                    result = postprocess_image(confidences, original_size=original_size)
-                    write_image(output_path, result)
+            original_size = raw_image.shape[:2]
 
-                except Exception as error:
-                    print(error)
+            x: torch.Tensor = preprocess_image(raw_image, device)
+            confidences: torch.Tensor = rotational_tta(x, model)["mask"]  # with no_grad
+            # confidences: torch.Tensor = model(x)["mask"]
+            result = postprocess_image(confidences, original_size=original_size)
+            write_image(output_path, result)
 
 
 if __name__ == "__main__":
