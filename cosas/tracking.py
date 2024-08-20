@@ -1,11 +1,14 @@
 import os
 import uuid
+from typing import List
+
 import mlflow
 import numpy as np
-
 import torch
-from .misc import plot_xypred, plot_patch_xypred
 import matplotlib.pyplot as plt
+
+from .misc import plot_xypred, plot_patch_xypred
+
 
 TRACKING_URI = "http://219.252.39.224:5000/"
 EXP_NAME = "cosas"
@@ -22,6 +25,22 @@ def get_experiment(experiment_name=EXP_NAME):
         return client.get_experiment_by_name(experiment_name)
 
     return experiment
+
+
+def get_child_run_ids(parent_run_id: str) -> List[str]:
+    """MLflow 부모의 Run ID로 자식의 Run ID들을 반환함"""
+
+    child_run_ids = []
+    experiment_id = mlflow.get_run(parent_run_id).info.experiment_id
+    all_runs = mlflow.search_runs(
+        experiment_ids=[experiment_id],
+        filter_string=f'tags.mlflow.parentRunId = "{parent_run_id}"',
+    )
+
+    for _, row in all_runs.iterrows():
+        child_run_ids.append(row["run_id"])
+
+    return child_run_ids
 
 
 def plot_and_save(
