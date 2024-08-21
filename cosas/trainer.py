@@ -211,7 +211,9 @@ class BinaryClassifierTrainer(ABC):
     ):
 
         best_state_dict = deepcopy(self.model.state_dict())
+
         best_loss = math.inf
+        best_metrics = 0
         patience = 0
         for epoch in range(epochs):
             train_loss, train_metrics = self.run_epoch(
@@ -230,7 +232,9 @@ class BinaryClassifierTrainer(ABC):
             if val_loss <= best_loss:
                 best_loss = val_loss
                 patience = 0
-                best_state_dict = deepcopy(self.model.state_dict())
+                if val_metrics.dice.avg >= best_metrics:
+                    best_metrics = val_metrics.dice.avg
+                    best_state_dict = deepcopy(self.model.state_dict())
             else:
                 patience += 1
                 if patience >= n_patience:
