@@ -117,7 +117,9 @@ if __name__ == "__main__":
         experiment_id=experiment.experiment_id, run_name=args.run_name
     ) as run:
         folds = KFold(n_splits=5, shuffle=True, random_state=42)
-        mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"))
+        mlflow.log_params(args.__dict__)
+        mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"), artifact_path="cosas")
+        mlflow.log_artifact(os.path.abspath(__file__))
 
         for fold, (train_val_indices, test_indices) in enumerate(
             folds.split(cosas_data2.images, cosas_data2.masks), start=1
@@ -157,20 +159,14 @@ if __name__ == "__main__":
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
-            if args.architecture != "TransUNet":
-                model = MultiTaskAE(
-                    architecture=args.architecture,
-                    encoder_name=args.encoder_name,
-                    input_size=(args.input_size, args.input_size),
-                ).to(args.device)
-            else:
-                model = MultiTaskTransAE(
-                    architecture=args.architecture,
-                    encoder_name="vit",
-                    input_size=(args.input_size, args.input_size),
-                ).to(args.device)
-
+            # MODEL
+            model = MultiTaskAE(
+                architecture=args.architecture,
+                encoder_name=args.encoder_name,
+                input_size=(args.input_size, args.input_size),
+            ).to(args.device)
             dp_model = torch.nn.DataParallel(model)
+
             trainer = AETrainer(
                 model=dp_model,
                 loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
