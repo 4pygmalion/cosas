@@ -436,7 +436,7 @@ class RandomPointsLiquify(A.DualTransform):
 
     def distort_image(self, img, transform_mesh):
         map_x, map_y = transform_mesh
-        return cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_LINEAR)
+        return cv2.remap(img, map_x, map_y, interpolation=cv2.INTER_NEAREST)
 
     def apply(self, img, transform_mesh, **params):
         return self.distort_image(img, transform_mesh)
