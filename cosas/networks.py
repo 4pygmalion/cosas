@@ -429,7 +429,9 @@ class MultiTaskAE(torch.nn.Module):
         self.encoder_name = encoder_name
         self.input_size = input_size
         self.architecture = getattr(smp, architecture)(
-            encoder_name=self.encoder_name, classes=6
+            encoder_name=self.encoder_name,
+            classes=6,
+            decoder_attention_type="scse",
         )
 
         self.stain_vec_head = self.architecture.segmentation_head
