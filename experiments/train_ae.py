@@ -180,8 +180,10 @@ if __name__ == "__main__":
                 nested=True,
             ):
                 mlflow.log_params(args.__dict__)
+                mlflow.log_artifacts(
+                    os.path.join(ROOT_DIR, "cosas"), artifact_path="cosas"
+                )
                 mlflow.log_artifact(os.path.abspath(__file__))
-                mlflow.log_artifact(os.path.join(ROOT_DIR, "cosas", "networks.py"))
 
                 trainer.train(
                     train_dataloader,
