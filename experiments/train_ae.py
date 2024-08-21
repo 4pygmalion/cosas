@@ -124,13 +124,13 @@ if __name__ == "__main__":
         for fold, (train_val_indices, test_indices) in enumerate(
             folds.split(cosas_data2.images, cosas_data2.masks), start=1
         ):
-            train_val_images = [cosas_data2.images[i] for i in train_val_indices]
-            train_val_masks = [cosas_data2.masks[i] for i in train_val_indices]
+            train_images = [cosas_data2.images[i] for i in train_val_indices]
+            train_masks = [cosas_data2.masks[i] for i in train_val_indices]
             test_images = [cosas_data2.images[i] for i in test_indices]
             test_masks = [cosas_data2.masks[i] for i in test_indices]
-            train_images, val_images, train_masks, val_masks = train_test_split(
-                train_val_images, train_val_masks, test_size=0.2, random_state=args.seed
-            )
+            # train_images, val_images, train_masks, val_masks = train_test_split(
+            #     train_val_images, train_val_masks, test_size=0.2, random_state=args.seed
+            # )
 
             # Append COSAS Task1 data
             train_images += cosas_data1.images if args.use_task1 else list()
@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
             # VAL, TEST Dataset
             val_dataset = dataset(
-                val_images, val_masks, test_transform, device=args.device
+                test_images, test_masks, test_transform, device=args.device
             )
             val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
             test_dataset = dataset(
