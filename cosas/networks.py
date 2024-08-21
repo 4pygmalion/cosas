@@ -438,6 +438,7 @@ class MultiTaskAE(torch.nn.Module):
         self.stain_den = UnetDecoder(
             encoder_channels=self.encoder.out_channels,
             decoder_channels=(256, 128, 64, 32, 2),
+            attention_type="scse",
         )
         self.stain_den_head = SegmentationHead(
             in_channels=2, out_channels=2, activation=None
