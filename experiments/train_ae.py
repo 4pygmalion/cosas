@@ -5,15 +5,15 @@ import mlflow
 import torch
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
-from cosas.networks import MultiTaskAE, MultiTaskTransAE
+from cosas.networks import MultiTaskAE
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
-from cosas.transforms import CopyTransform, GridElasticTransform
+from cosas.transforms import CopyTransform
 from cosas.losses import AELoss
 from cosas.misc import set_seed, get_config
 from cosas.trainer import AETrainer
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     args = get_config()
     set_seed(42)
 
-    cosas_data2 = COSASData(DATA_DIR, task=2)
+    cosas_data2 = COSASData(DATA_DIR, task=1)
     cosas_data2.load()
 
     if args.use_task1:
@@ -116,13 +116,13 @@ if __name__ == "__main__":
     with mlflow.start_run(
         experiment_id=experiment.experiment_id, run_name=args.run_name
     ) as run:
-        folds = KFold(n_splits=5, shuffle=True, random_state=42)
+        folds = StratifiedKFold(n_splits=4, shuffle=False, random_state=args.seed)
         mlflow.log_params(args.__dict__)
         mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"), artifact_path="cosas")
         mlflow.log_artifact(os.path.abspath(__file__))
 
         for fold, (train_val_indices, test_indices) in enumerate(
-            folds.split(cosas_data2.images, cosas_data2.masks), start=1
+            folds.split(cosas_data2.images, cosas_data2.domain_indices), start=1
         ):
             train_val_images = [cosas_data2.images[i] for i in train_val_indices]
             train_val_masks = [cosas_data2.masks[i] for i in train_val_indices]
