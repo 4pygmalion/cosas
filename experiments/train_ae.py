@@ -73,7 +73,6 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument("--alpha", type=float, default=1.0)
     parser.add_argument(
         "--use_sn",
-        type=bool,
         action="store_true",
         help="use stain noramlization(vahadane)",
         default=False,
