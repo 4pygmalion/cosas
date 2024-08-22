@@ -116,7 +116,7 @@ if __name__ == "__main__":
     with mlflow.start_run(
         experiment_id=experiment.experiment_id, run_name=args.run_name
     ) as run:
-        folds = StratifiedKFold(n_splits=4, shuffle=False, random_state=args.seed)
+        folds = StratifiedKFold(n_splits=4, shuffle=False)
         mlflow.log_params(args.__dict__)
         mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"), artifact_path="cosas")
         mlflow.log_artifact(os.path.abspath(__file__))
@@ -126,10 +126,15 @@ if __name__ == "__main__":
         ):
             train_val_images = [cosas_data2.images[i] for i in train_val_indices]
             train_val_masks = [cosas_data2.masks[i] for i in train_val_indices]
+            train_val_domains = cosas_data2.domain_indices[train_val_indices]
             test_images = [cosas_data2.images[i] for i in test_indices]
             test_masks = [cosas_data2.masks[i] for i in test_indices]
             train_images, val_images, train_masks, val_masks = train_test_split(
-                train_val_images, train_val_masks, test_size=0.2, random_state=args.seed
+                train_val_images,
+                train_val_masks,
+                test_size=0.2,
+                random_state=args.seed,
+                stratify=train_val_domains,
             )
 
             # Append COSAS Task1 data
