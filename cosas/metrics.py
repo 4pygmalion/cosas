@@ -56,7 +56,7 @@ class Metrics:
     spec: AverageMeter = None
     auroc: AverageMeter = None
     prauc: AverageMeter = None
-    cosas_score : AverageMeter = None
+    cosas_score: AverageMeter = None
 
     def __post_init__(self):
         self.f1 = AverageMeter("f1")
@@ -88,6 +88,9 @@ class Metrics:
 
 def compute_iou(pred: np.ndarray, target: np.ndarray) -> float:
     """Intersection over Union 계산"""
+    if pred.sum() + target.sum() == 0:
+        return 1.0
+
     intersection = np.logical_and(pred, target).sum()
     union = np.logical_or(pred, target).sum()
     iou = intersection / union if union != 0 else 0.0
@@ -96,6 +99,9 @@ def compute_iou(pred: np.ndarray, target: np.ndarray) -> float:
 
 def compute_dice(pred: np.ndarray, target: np.ndarray) -> float:
     """DICE score 계산"""
+    if pred.sum() + target.sum() == 0:
+        return 1.0
+
     intersection = np.logical_and(pred, target).sum()
     dice = (
         (2 * intersection) / (pred.sum() + target.sum())
@@ -128,32 +134,27 @@ def calculate_metrics(
     targets: np.ndarray,
     threshold=0.5,
 ) -> Dict[str, float]:
-    pred_confidence = confidences
-    pred_label = pred_confidence >= threshold
+    pred_label = confidences >= threshold
 
     f1 = f1_score(targets, pred_label)
     acc = accuracy_score(targets, pred_label)
 
-    # All negative pixels:
-    if np.sum(targets) == len(targets):
-        spec = 1.0
-    else:
-        spec = specificity_score(targets, pred_label)
+    # Calculate specificity
+    spec = specificity_score(targets, pred_label) if targets.sum() > 0 else 1.0
 
-    if targets.sum() == 0:
-        sen = 0
-        auroc = 0
-        prauc = 0
-    else:
-        sen = recall_score(targets, pred_label)
-        auroc = (
-            roc_auc_score(targets, pred_confidence)
-            if len(np.unique(targets)) > 1
-            else 0.0
-        )
-        pr, rc, _ = precision_recall_curve(targets, pred_confidence)
+    # Calculate sensitivity
+    sen = recall_score(targets, pred_label) if targets.sum() > 0 else 0.0
+
+    # Calculate AUROC
+    auroc = roc_auc_score(targets, confidences) if len(np.unique(targets)) > 1 else 0.0
+
+    # Calculate Precision-Recall AUC
+    prauc = 0.0
+    if targets.sum() > 0:
+        pr, rc, _ = precision_recall_curve(targets, confidences)
         prauc = auc(rc, pr)
 
+    # Calculate IoU and Dice
     iou = compute_iou(pred_label, targets)
     dice = compute_dice(pred_label, targets)
 
@@ -166,7 +167,7 @@ def calculate_metrics(
         "prauc": prauc,
         "iou": iou,
         "dice": dice,
-        "cosas_score": (iou + dice) / 2
+        "cosas_score": (iou + dice) / 2,
     }
 
 
