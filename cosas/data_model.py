@@ -157,3 +157,14 @@ class COSASData:
             masks.extend(domain_data.masks)
 
         return masks
+    
+    @property
+    def domain_indices(self)-> np.ndarray:
+        """각 데이터포인트의 도메인 번호를 반환"""
+        res = list()
+        for i, domain in enumerate(self.domains):
+            domain_data: ScannerData = getattr(self, domain.name)
+            n_data = len(domain_data)
+            res += [i] * n_data
+            
+        return np.array(res, dtype=np.uint8)
