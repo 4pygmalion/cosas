@@ -152,6 +152,7 @@ class Evaluator(BinaryClassifierTrainer):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--parent_id", type=str, required=True)
+    parser.add_argument("-t", "--task", type=int, required=True, help="Task number")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     return parser.parse_args()
 
@@ -202,7 +203,7 @@ def process_fold(
 def main():
     args = get_args()
 
-    cosas_data: COSASData = load_data(task=2)
+    cosas_data: COSASData = load_data(task=args.task)
 
     parent_run = mlflow.get_run(args.parent_id)
     parent_run_name = parent_run.info.run_name
