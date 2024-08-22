@@ -88,6 +88,9 @@ class Metrics:
 
 def compute_iou(pred: np.ndarray, target: np.ndarray) -> float:
     """Intersection over Union 계산"""
+    if pred.sum() + target.sum() == 0:
+        return 1.0
+
     intersection = np.logical_and(pred, target).sum()
     union = np.logical_or(pred, target).sum()
     iou = intersection / union if union != 0 else 0.0
@@ -96,6 +99,9 @@ def compute_iou(pred: np.ndarray, target: np.ndarray) -> float:
 
 def compute_dice(pred: np.ndarray, target: np.ndarray) -> float:
     """DICE score 계산"""
+    if pred.sum() + target.sum() == 0:
+        return 1.0
+
     intersection = np.logical_and(pred, target).sum()
     dice = (
         (2 * intersection) / (pred.sum() + target.sum())
@@ -151,10 +157,6 @@ def calculate_metrics(
     # Calculate IoU and Dice
     iou = compute_iou(pred_label, targets)
     dice = compute_dice(pred_label, targets)
-
-    # Fully negative images and prediction
-    if targets.sum() + pred_label.sum() == 0:
-        iou = dice = 1.0
 
     return {
         "f1": f1,
