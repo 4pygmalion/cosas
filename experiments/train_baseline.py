@@ -83,6 +83,7 @@ if __name__ == "__main__":
                 )
 
             train_transform, test_transform = get_transforms(args.input_size)
+            dataset = DATASET_REGISTRY[args.dataset]
             train_dataset = dataset(
                 train_images, train_masks, train_transform, device=args.device
             )
