@@ -11,7 +11,9 @@ torchvision
 torchaudio
 einops==0.3.0
 
+# models
 segmentation-models-pytorch
+transformers
 albumentations
 
 # for CI
