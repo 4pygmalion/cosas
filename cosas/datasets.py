@@ -1,7 +1,7 @@
 import random
 from typing import Tuple, List
 
-
+import cv2
 import tqdm
 import torch
 import numpy as np
@@ -13,6 +13,8 @@ from cosas.transforms import tesellation, pad_image_tensor
 
 
 class Patchdataset(Dataset):
+    """한 이미지를 패치로 나눠 N개의 패치를 차원을 높여 (1, p, w, h)만든 데이터셋"""
+
     def __init__(
         self, images, masks, transform: A.Compose | None = None, device: str = "cuda"
     ):
@@ -22,6 +24,7 @@ class Patchdataset(Dataset):
         self.device = device
 
         # uint8
+        self.patch_size = (512, 512)
         self.patch_images: List[np.ndarray] = None
         self.patch_masks: List[np.ndarray] = None
         self._tesellate_patch_mask()
@@ -31,22 +34,28 @@ class Patchdataset(Dataset):
         self.patch_images = list()
         self.patch_masks = list()
         for image, mask in zip(self.images, self.masks):
-            image_tensor = ToTensor()(image)
-            mask_tensor = ToTensor()(mask)  # [0, 1] normalized
-            pad_image = pad_image_tensor(image_tensor)
-            pad_mask = pad_image_tensor(mask_tensor)
-            self.patch_images.append(tesellation(pad_image))
-            self.patch_masks.append(tesellation(pad_mask))
+            resize_image = cv2.resize(
+                image, dsize=(512 * 3, 512 * 3), interpolation=cv2.INTER_NEAREST
+            )
+            resize_mask = cv2.resize(
+                mask[:, :, np.newaxis],
+                dsize=(512 * 3, 512 * 3),
+                interpolation=cv2.INTER_NEAREST,
+            )[:, :, np.newaxis]
 
-        # (n, c, h, w), uint8
-        self.patch_images = [
-            (patch_tensor.permute(1, 2, 0) * 255).numpy().astype(np.uint8)
-            for patch_tensor in torch.concat(self.patch_images, dim=0)
-        ]
-        self.patch_masks = [
-            (patch_tensor.permute(1, 2, 0) * 255).numpy().astype(np.uint8)
-            for patch_tensor in torch.concat(self.patch_masks, dim=0)
-        ]
+            self.patch_images.append(
+                tesellation(resize_image, patch_size=self.patch_size).reshape(
+                    -1, *self.patch_size, 3
+                )
+            )
+            self.patch_masks.append(
+                tesellation(resize_mask, patch_size=self.patch_size).reshape(
+                    -1, *self.patch_size, 1
+                )
+            )
+
+        self.patch_images = np.concatenate(self.patch_images, axis=0)
+        self.patch_masks = np.concatenate(self.patch_masks, axis=0)
 
         return
 
