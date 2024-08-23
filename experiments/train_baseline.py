@@ -3,7 +3,7 @@ import os
 import mlflow
 import segmentation_models_pytorch as smp
 import torch
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from cosas.tracking import get_experiment
@@ -55,19 +55,27 @@ if __name__ == "__main__":
     with mlflow.start_run(
         experiment_id=experiment.experiment_id, run_name=args.run_name
     ) as run:
-        folds = KFold(n_splits=5, shuffle=True, random_state=42)
+        folds = StratifiedKFold(n_splits=4, shuffle=False)
+        mlflow.log_params(args.__dict__)
+        mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"), artifact_path="cosas")
+        mlflow.log_artifact(os.path.abspath(__file__))
+
         for fold, (train_val_indices, test_indices) in enumerate(
-            folds.split(cosas_data.images, cosas_data.masks), start=1
+            folds.split(cosas_data.images, cosas_data.domain_indices), start=1
         ):
+
             train_val_images = [cosas_data.images[i] for i in train_val_indices]
             train_val_masks = [cosas_data.masks[i] for i in train_val_indices]
+            train_val_domains = cosas_data.domain_indices[train_val_indices]
             test_images = [cosas_data.images[i] for i in test_indices]
             test_masks = [cosas_data.masks[i] for i in test_indices]
-
             train_images, val_images, train_masks, val_masks = train_test_split(
-                train_val_images, train_val_masks, test_size=0.2, random_state=args.seed
+                train_val_images,
+                train_val_masks,
+                test_size=0.2,
+                random_state=args.seed,
+                stratify=train_val_domains,
             )
-            dataset = DATASET_REGISTRY[args.dataset]
 
             if args.use_sn:
                 train_images, val_images, test_images = stain_normalization(
