@@ -447,13 +447,6 @@ class AETrainer(BinaryClassifierTrainer):
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-        scheduler = torch.optim.lr_scheduler.CyclicLR(
-            self.optimizer,
-            base_lr=0.001,
-            max_lr=0.1,
-            step_size_up=int(len(dataloader)) * 4,
-            step_size_down=int(len(dataloader)) * 4,
-        )
         i = 0
         for step, batch in enumerate(dataloader):
             xs, ys = batch
@@ -473,7 +466,6 @@ class AETrainer(BinaryClassifierTrainer):
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                scheduler.step()
 
             else:
                 with torch.no_grad():
