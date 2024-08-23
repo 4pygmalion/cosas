@@ -11,8 +11,6 @@ from torchvision.transforms.functional import pad
 from albumentations.pytorch.transforms import ToTensorV2
 from histomicstk.preprocessing.color_conversion import rgb_to_lab
 
-from cosas.randstainna.randstainna import RandStainNA, Dict2Class
-
 
 def get_image_stats(
     images: np.ndarray | List[np.ndarray],
