@@ -1,7 +1,8 @@
 import random
 import math
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Optional
 
+import cv2
 import numpy as np
 import torch
 import albumentations as A
@@ -9,6 +10,8 @@ from PIL import Image
 from torchvision.transforms.functional import pad
 from albumentations.pytorch.transforms import ToTensorV2
 from histomicstk.preprocessing.color_conversion import rgb_to_lab
+
+from cosas.randstainna.randstainna import RandStainNA, Dict2Class
 
 
 def get_image_stats(
@@ -121,7 +124,7 @@ def remove_pad(image_tensor: torch.Tensor, original_size: tuple):
     return image_tensor[:, :W, :H]
 
 
-def tesellation(image_tensor: torch.Tensor, size: tuple = (224, 224)) -> torch.Tensor:
+def tesellation(image_tensor: np.ndarray, patch_size: tuple = (224, 224)) -> np.ndarray:
     """size의 정수배인 image_tensor을 입력받아, 패치단위로 타일링을 진행
 
     Note:
@@ -138,19 +141,19 @@ def tesellation(image_tensor: torch.Tensor, size: tuple = (224, 224)) -> torch.T
         pathces (torch.Tensor): shape (B, n_patches, c, patch_h, patch_w)
 
     """
+    image_height, image_width, channels = image_tensor.shape
+    patch_height, patch_width = patch_size
 
-    assert image_tensor.ndim == 4, "image_tensor must be 4-dimensional"
-    B, C, W, H = image_tensor.shape
+    num_patches_height = image_height // patch_height
+    num_patches_width = image_width // patch_width
 
-    patch_w, patch_h = size
-
-    # (C, W, H)
-    # image_tensor: torch.Tensor = pad_image_tensor(image_tensor)
-    patches = image_tensor.unfold(2, patch_h, patch_h).unfold(3, patch_w, patch_w)
-
-    # (C, row, W, h) -> (C, row, w, col, h, w)
-    patches = patches.contiguous().view(B, C, -1, patch_h, patch_w)
-    patches = patches.permute(0, 2, 1, 3, 4)
+    patches = (
+        image_tensor.reshape(
+            num_patches_height, patch_height, num_patches_width, patch_width, channels
+        )
+        .transpose(0, 2, 1, 3, 4)
+        .reshape(-1, patch_height, patch_width, channels)
+    )
 
     return patches
 
