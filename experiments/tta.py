@@ -154,6 +154,7 @@ def get_args():
     parser.add_argument("-p", "--parent_id", type=str, required=True)
     parser.add_argument("-t", "--task", type=int, required=True, help="Task number")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
+    parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
     return parser.parse_args()
 
 
@@ -163,7 +164,7 @@ def load_data(task: int = 2):
     return cosas_data
 
 
-def prepare_test_dataloader(test_images, test_masks, input_size, device):
+def prepare_test_dataloader(test_images, test_masks, input_size, batch_size, device):
     test_transform = A.Compose(
         [
             A.Resize(input_size, input_size),
@@ -174,7 +175,7 @@ def prepare_test_dataloader(test_images, test_masks, input_size, device):
     test_dataset = ImageMaskDataset(
         test_images, test_masks, test_transform, device=device
     )
-    return DataLoader(test_dataset, batch_size=128, shuffle=False)
+    return DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 
 def process_fold(
@@ -225,7 +226,11 @@ def main():
             test_images = [cosas_data.images[i] for i in test_indices]
             test_masks = [cosas_data.masks[i] for i in test_indices]
             test_dataloader = prepare_test_dataloader(
-                test_images, test_masks, int(params["input_size"]), args.device
+                test_images,
+                test_masks,
+                int(params["input_size"]),
+                args.batch_size,
+                args.device,
             )
 
             model_uri = MODEL_URI.format(run_id=child_run_id)
