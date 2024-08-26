@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from torchvision.transforms.functional import rotate
 
 from .data_model import COSASData, Scanncers
-from .transforms import remove_pad, reverse_tesellation
+from .transforms import remove_pad, reverse_tesellation, AUG_REGISTRY
 from .networks import MODEL_REGISTRY
 from .losses import LOSS_REGISTRY
 
@@ -65,7 +65,9 @@ def get_config() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
-    parser.add_argument("--use_sa", action="store_true", help="Use stain augmentation")
+    parser.add_argument(
+        "--sa", choices=list(AUG_REGISTRY.keys()), help="Use stain augmentation"
+    )
     return parser.parse_args()
 
 

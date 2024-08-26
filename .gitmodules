@@ -1,3 +1,6 @@
 [submodule "cosas/randstainna"]
 	path = cosas/randstainna
 	url = https://github.com/yiqings/RandStainNA.git
+[submodule "cosas/stain_seperation"]
+	path = cosas/stain_seperation
+	url = https://github.com/4pygmalion/StainSeperationSA.git

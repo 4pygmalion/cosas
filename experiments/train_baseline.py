@@ -1,7 +1,5 @@
 import os
-from typing import List
 
-import numpy as np
 import mlflow
 import segmentation_models_pytorch as smp
 import torch
@@ -16,6 +14,7 @@ from cosas.transforms import (
     get_transforms,
     find_representative_lab_image,
     get_lab_distribution,
+    AUG_REGISTRY,
 )
 from cosas.losses import LOSS_REGISTRY
 from cosas.misc import set_seed, get_config
@@ -41,33 +40,6 @@ def stain_normalization(train_images, val_images, test_images):
     test_images = [reinhard(image, means, stds) for image in test_images]
 
     return train_images, val_images, test_images
-
-
-def stain_augmentation(
-    train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
-) -> List[np.ndarray]:
-    from cosas.transforms import (
-        ConfigRandStainNA,
-        get_randstainna_params,
-        RANDSTAINNA_TEMPLATE,
-    )
-
-    color_params = get_randstainna_params(train_images)
-    config = RANDSTAINNA_TEMPLATE.copy()
-    config.update(color_params)
-    ranstainna = ConfigRandStainNA(config)
-
-    new_images = list()
-    new_masks = list()
-    for _ in range(multiple):
-        for image, mask in zip(train_images, train_masks):
-            new_images.append(ranstainna(image))
-            new_masks.append(mask)
-
-    new_images.extend(train_images)
-    new_masks.extend(train_masks)
-
-    return new_images, new_masks
 
 
 if __name__ == "__main__":
@@ -110,8 +82,9 @@ if __name__ == "__main__":
                 train_images, val_images, test_images = stain_normalization(
                     train_images, val_images, test_images
                 )
-            if args.use_sa:
-                train_image, train_masks = stain_augmentation(train_images, train_masks)
+            if args.sa:
+                aug_fn = AUG_REGISTRY[args.sa]
+                train_image, train_masks = aug_fn(train_images, train_masks)
 
             train_transform, test_transform = get_transforms(args.input_size)
             dataset = DATASET_REGISTRY[args.dataset]

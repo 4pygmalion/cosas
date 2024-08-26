@@ -22,3 +22,10 @@ $ make test_run
 ```bash
 $ make save
 ```
+
+
+#### Spams 설치
+- https://pypi.org/project/spams/
+```bash
+$ sudo apt-get -y install libblas-dev liblapack-dev gfortran
+```
