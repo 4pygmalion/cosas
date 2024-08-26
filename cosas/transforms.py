@@ -1,7 +1,8 @@
 import random
 import math
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Optional
 
+import cv2
 import numpy as np
 import torch
 import albumentations as A
@@ -9,6 +10,7 @@ from PIL import Image
 from torchvision.transforms.functional import pad
 from albumentations.pytorch.transforms import ToTensorV2
 from histomicstk.preprocessing.color_conversion import rgb_to_lab
+from .randstainna.randstainna import RandStainNA, Dict2Class
 
 
 def get_image_stats(
@@ -381,7 +383,7 @@ class GridElasticTransform(A.DualTransform):
         return ("n_grid_width", "n_grid_height", "magnitude")
 
 
-def get_dist_params(images: List[np.ndarray]) -> dict:
+def get_randstainna_params(images: List[np.ndarray]) -> dict:
     """
 
     Params:
@@ -441,7 +443,29 @@ def get_dist_params(images: List[np.ndarray]) -> dict:
     return params
 
 
-class _RandStainNA(RandStainNA):
+RANDSTAINNA_TEMPLATE = {
+    "A": {
+        "avg": {"distribution": "laplace", "mean": 151.187, "std": 10.958},
+        "std": {"distribution": "laplace", "mean": 8.134, "std": 2.822},
+    },
+    "B": {
+        "avg": {"distribution": "norm", "mean": 116.812, "std": 6.643},
+        "std": {"distribution": "norm", "mean": 6.129, "std": 2.013},
+    },
+    "L": {
+        "avg": {"distribution": "norm", "mean": 158.033, "std": 48.792},
+        "std": {"distribution": "norm", "mean": 36.899, "std": 14.383},
+    },
+    "color_space": "LAB",
+    "methods": "Reinhard",
+    "n_each_class": 0,
+    "random": True,
+}
+
+
+class ConfigRandStainNA(RandStainNA):
+    """Config 저장없이"""
+
     def __init__(
         self,
         config: dict,
