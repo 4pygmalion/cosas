@@ -172,7 +172,7 @@ def stain_normalization(images: List[np.ndarray]):
 
     target_image = Image.open(
         "/vast/AI_team/dataset/COSAS24-TrainingSet/task2/3d-1000/image/db4b0298b346.png"
-    ).resize(512, 512)
+    ).resize((512, 512))
 
     normalizer.fit(np.array(target_image))
 
