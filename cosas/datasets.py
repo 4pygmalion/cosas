@@ -16,7 +16,12 @@ class Patchdataset(Dataset):
     """한 이미지를 패치로 나눠 N개의 패치를 차원을 높여 (1, p, w, h)만든 데이터셋"""
 
     def __init__(
-        self, images, masks, transform: A.Compose | None = None, device: str = "cuda"
+        self,
+        images,
+        masks,
+        transform: A.Compose | None = None,
+        patch_size: tuple = (512, 512),
+        device: str = "cuda",
     ):
         self.images = images  # uint8
         self.masks = masks  # uint8
@@ -24,7 +29,7 @@ class Patchdataset(Dataset):
         self.device = device
 
         # uint8
-        self.patch_size = (512, 512)
+        self.patch_size = patch_size
         self.patch_images: List[np.ndarray] = None
         self.patch_masks: List[np.ndarray] = None
         self._tesellate_patch_mask()
