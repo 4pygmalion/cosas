@@ -1,10 +1,11 @@
 import argparse
-from typing import Tuple
+from typing import Tuple, List
 
 import numpy as np
 import mlflow
 import albumentations as A
 import torch
+from PIL import Image
 from progress.bar import Bar
 from torchvision.transforms import ToPILImage
 from torch.utils.data import DataLoader
@@ -25,6 +26,7 @@ from cosas.tracking import (
 from cosas.datasets import ImageMaskDataset
 from cosas.metrics import summarize_metrics
 from cosas.misc import rotational_tta
+from cosas.normalization import SPCNNormalizer
 
 
 MODEL_URI = "file:///vast/AI_team/mlflow_artifact/13/{run_id}/artifacts/model"
@@ -155,6 +157,7 @@ def get_args():
     parser.add_argument("-t", "--task", type=int, required=True, help="Task number")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
+    parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
     return parser.parse_args()
 
 
@@ -162,6 +165,21 @@ def load_data(task: int = 2):
     cosas_data = COSASData(DATA_DIR, task=task)
     cosas_data.load()
     return cosas_data
+
+
+def stain_normalization(images: List[np.ndarray]):
+    normalizer = SPCNNormalizer()
+
+    target_image = Image.open(
+        "/vast/AI_team/dataset/COSAS24-TrainingSet/task2/3d-1000/image/db4b0298b346.png"
+    ).resize(512, 512)
+
+    normalizer.fit(np.array(target_image))
+
+    new_images = list()
+    for image in images:
+        new_images.append(normalizer.transform(image))
+    return new_images
 
 
 def prepare_test_dataloader(test_images, test_masks, input_size, batch_size, device):
@@ -225,6 +243,9 @@ def main():
 
             test_images = [cosas_data.images[i] for i in test_indices]
             test_masks = [cosas_data.masks[i] for i in test_indices]
+
+            if args.use_sn:
+                test_images = stain_normalization(test_images)
             test_dataloader = prepare_test_dataloader(
                 test_images,
                 test_masks,

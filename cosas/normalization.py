@@ -3,7 +3,12 @@ import numpy as np
 import spams
 from PIL import Image
 
-from seestaina.misc import od_to_rgb, hash_image, rgb_to_od, normalize_rows
+from .stain_seperation.seestaina.misc import (
+    od_to_rgb,
+    hash_image,
+    rgb_to_od,
+    normalize_rows,
+)
 
 
 def find_median_lab_image(images: list[np.ndarray]) -> np.ndarray:
