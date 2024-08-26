@@ -1,0 +1,3 @@
+[submodule "cosas/randstainna"]
+	path = cosas/randstainna
+	url = https://github.com/yiqings/RandStainNA.git

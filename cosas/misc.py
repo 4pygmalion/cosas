@@ -65,6 +65,7 @@ def get_config() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
+    parser.add_argument("--use_sa", action="store_true", help="Use stain augmentation")
     return parser.parse_args()
 
 
