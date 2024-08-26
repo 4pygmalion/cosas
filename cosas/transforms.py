@@ -513,49 +513,97 @@ class ConfigRandStainNA(RandStainNA):
         self.is_train = is_train
 
 
-class AlbuRandStainNA(A.ImageOnlyTransform):
-    """Randomly changes the brightness, contrast, and saturation of an image. Compared to ColorJitter from torchvision,
-    this transform gives a little bit different results because Pillow (used in torchvision) and OpenCV (used in
-    Albumentations) transform an image to HSV format by different formulas. Another difference - Pillow uses uint8
-    overflow, but we use value saturation.
+def augmentation_randstainna(
+    train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
+) -> List[np.ndarray]:
+    from .transforms import (
+        ConfigRandStainNA,
+        get_randstainna_params,
+        RANDSTAINNA_TEMPLATE,
+    )
 
-    Args:
-        brightness (float or tuple of float (min, max)): How much to jitter brightness.
-            If float:
-                brightness_factor is chosen uniformly from [max(0, 1 - brightness), 1 + brightness]
-            If tuple[float, float]] will be sampled from that range. Both values should be non negative numbers.
-        contrast (float or tuple of float (min, max)): How much to jitter contrast.
-            If float:
-                contrast_factor is chosen uniformly from [max(0, 1 - brightness), 1 + brightness]
-            If tuple[float, float]] will be sampled from that range. Both values should be non negative numbers.
-        saturation (float or tuple of float (min, max)): How much to jitter saturation.
-            If float:
-               saturation_factor is chosen uniformly from [max(0, 1 - brightness), 1 + brightness]
-            If tuple[float, float]] will be sampled from that range. Both values should be non negative numbers.
-        hue (float or tuple of float (min, max)): How much to jitter hue.
-            If float:
-               saturation_factor is chosen uniformly from [-hue, hue]. Should have 0 <= hue <= 0.5.
-            If tuple[float, float]] will be sampled from that range. Both values should be in range [-0.5, 0.5].
+    color_params = get_randstainna_params(train_images)
+    config = RANDSTAINNA_TEMPLATE.copy()
+    config.update(color_params)
+    ranstainna = ConfigRandStainNA(config)
 
-    """
+    new_images = list()
+    new_masks = list()
+    for _ in range(multiple):
+        for image, mask in zip(train_images, train_masks):
+            new_images.append(ranstainna(image))
+            new_masks.append(mask)
 
-    def __init__(
-        self,
-        config,
-        always_apply: bool | None = None,
-        p: float = 0.5,
-    ):
-        super().__init__(p=p, always_apply=always_apply)
+    new_images.extend(train_images)
+    new_masks.extend(train_masks)
 
-        self.config = config
-        self.randstainna = RandStainNA(config)
+    return new_images, new_masks
 
-    def apply(
-        self,
-        img: np.ndarray,
-        **params: Any,
-    ) -> np.ndarray:
 
-        res = self.randstainna(img)
+def augmentation_stain_seperation(
+    train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
+) -> List[np.ndarray]:
 
-        return res
+    from .stain_seperation.seestaina.structure_preversing import Augmentor
+
+    augmentor = Augmentor()
+
+    new_images = list()
+    new_masks = list()
+    for _ in range(multiple):
+        for image, mask in zip(train_images, train_masks):
+            new_images.append(
+                augmentor.image_augmentation_with_stain_vector(
+                    image, aug_saturation=True, aug_density=True, aug_value=True
+                )
+            )
+            new_masks.append(mask)
+
+    new_images.extend(train_images)
+    new_masks.extend(train_masks)
+
+    return new_images, new_masks
+
+
+def aug_mix(
+    train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
+) -> List[np.ndarray]:
+    from .stain_seperation.seestaina.structure_preversing import Augmentor
+    from .transforms import (
+        ConfigRandStainNA,
+        get_randstainna_params,
+        RANDSTAINNA_TEMPLATE,
+    )
+
+    color_params = get_randstainna_params(train_images)
+    config = RANDSTAINNA_TEMPLATE.copy()
+    config.update(color_params)
+    randstainna = ConfigRandStainNA(config)
+
+    augmentor = Augmentor()
+
+    new_images = list()
+    new_masks = list()
+    for _ in range(multiple):
+        for image, mask in zip(train_images, train_masks):
+            if random.random() >= 0.5:
+                new_image = augmentor.image_augmentation_with_stain_vector(
+                    image, aug_saturation=True, aug_density=True, aug_value=True
+                )
+            else:
+                new_image = randstainna(image)
+
+            new_images.append(new_image)
+            new_masks.append(mask)
+
+    new_images.extend(train_images)
+    new_masks.extend(train_masks)
+
+    return new_images, new_masks
+
+
+AUG_REGISTRY = {
+    "randstainna": augmentation_randstainna,
+    "stain_sep": augmentation_stain_seperation,
+    "mix": aug_mix,
+}
