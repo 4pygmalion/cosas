@@ -1,7 +1,8 @@
 import random
 import math
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Optional
 
+import cv2
 import numpy as np
 import torch
 import albumentations as A
@@ -9,6 +10,7 @@ from PIL import Image
 from torchvision.transforms.functional import pad
 from albumentations.pytorch.transforms import ToTensorV2
 from histomicstk.preprocessing.color_conversion import rgb_to_lab
+from .randstainna.randstainna import RandStainNA, Dict2Class
 
 
 def get_image_stats(
@@ -379,3 +381,181 @@ class GridElasticTransform(A.DualTransform):
 
     def get_transform_init_args_names(self):
         return ("n_grid_width", "n_grid_height", "magnitude")
+
+
+def get_randstainna_params(images: List[np.ndarray]) -> dict:
+    """
+
+    Params:
+        images (List[np.ndarray]): RGB uint8 이미지
+    """
+
+    l_mean = list()
+    l_sd = list()
+    a_mean = list()
+    a_sd = list()
+    b_mean = list()
+    b_sd = list()
+
+    for image in images:
+        lab_image = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
+        L_channel, A_channel, B_channel = cv2.split(lab_image)
+        l_mean.append(L_channel.mean())
+        a_mean.append(A_channel.mean())
+        b_mean.append(B_channel.mean())
+
+        l_sd.append(L_channel.std())
+        a_sd.append(A_channel.std())
+        b_sd.append(B_channel.std())
+
+    params = {
+        "L": {
+            "avg": {
+                "mean": float(np.mean(l_mean)),
+                "std": float(np.std(l_mean)),
+            },
+            "std": {
+                "mean": float(np.mean(l_sd)),
+                "std": float(np.std(l_sd)),
+            },
+        },
+        "A": {
+            "avg": {
+                "mean": float(np.mean(a_mean)),
+                "std": float(np.std(a_mean)),
+            },
+            "std": {
+                "mean": float(np.mean(a_sd)),
+                "std": float(np.std(a_sd)),
+            },
+        },
+        "B": {
+            "avg": {
+                "mean": float(np.mean(b_mean)),
+                "std": float(np.std(b_mean)),
+            },
+            "std": {
+                "mean": float(np.mean(b_sd)),
+                "std": float(np.std(b_sd)),
+            },
+        },
+    }
+    return params
+
+
+RANDSTAINNA_TEMPLATE = {
+    "A": {
+        "avg": {"distribution": "laplace", "mean": 151.187, "std": 10.958},
+        "std": {"distribution": "laplace", "mean": 8.134, "std": 2.822},
+    },
+    "B": {
+        "avg": {"distribution": "norm", "mean": 116.812, "std": 6.643},
+        "std": {"distribution": "norm", "mean": 6.129, "std": 2.013},
+    },
+    "L": {
+        "avg": {"distribution": "norm", "mean": 158.033, "std": 48.792},
+        "std": {"distribution": "norm", "mean": 36.899, "std": 14.383},
+    },
+    "color_space": "LAB",
+    "methods": "Reinhard",
+    "n_each_class": 0,
+    "random": True,
+}
+
+
+class ConfigRandStainNA(RandStainNA):
+    """Config 저장없이"""
+
+    def __init__(
+        self,
+        config: dict,
+        std_hyper: Optional[float] = 0,
+        distribution: Optional[str] = "normal",
+        probability: Optional[float] = 1.0,
+        is_train: Optional[bool] = True,
+    ):
+        self.config = config
+        c_s = config["color_space"]
+
+        self._channel_avgs = {
+            "avg": [
+                config[c_s[0]]["avg"]["mean"],
+                config[c_s[1]]["avg"]["mean"],
+                config[c_s[2]]["avg"]["mean"],
+            ],
+            "std": [
+                config[c_s[0]]["avg"]["std"],
+                config[c_s[1]]["avg"]["std"],
+                config[c_s[2]]["avg"]["std"],
+            ],
+        }
+        self._channel_stds = {
+            "avg": [
+                config[c_s[0]]["std"]["mean"],
+                config[c_s[1]]["std"]["mean"],
+                config[c_s[2]]["std"]["mean"],
+            ],
+            "std": [
+                config[c_s[0]]["std"]["std"],
+                config[c_s[1]]["std"]["std"],
+                config[c_s[2]]["std"]["std"],
+            ],
+        }
+
+        self.channel_avgs = Dict2Class(self._channel_avgs)
+        self.channel_stds = Dict2Class(self._channel_stds)
+
+        self.color_space = config["color_space"]
+        self.p = probability
+        self.std_adjust = std_hyper
+        self.color_space = c_s
+        self.distribution = distribution
+        self.is_train = is_train
+
+
+class AlbuRandStainNA(A.ImageOnlyTransform):
+    """Randomly changes the brightness, contrast, and saturation of an image. Compared to ColorJitter from torchvision,
+    this transform gives a little bit different results because Pillow (used in torchvision) and OpenCV (used in
+    Albumentations) transform an image to HSV format by different formulas. Another difference - Pillow uses uint8
+    overflow, but we use value saturation.
+
+    Args:
+        brightness (float or tuple of float (min, max)): How much to jitter brightness.
+            If float:
+                brightness_factor is chosen uniformly from [max(0, 1 - brightness), 1 + brightness]
+            If tuple[float, float]] will be sampled from that range. Both values should be non negative numbers.
+        contrast (float or tuple of float (min, max)): How much to jitter contrast.
+            If float:
+                contrast_factor is chosen uniformly from [max(0, 1 - brightness), 1 + brightness]
+            If tuple[float, float]] will be sampled from that range. Both values should be non negative numbers.
+        saturation (float or tuple of float (min, max)): How much to jitter saturation.
+            If float:
+               saturation_factor is chosen uniformly from [max(0, 1 - brightness), 1 + brightness]
+            If tuple[float, float]] will be sampled from that range. Both values should be non negative numbers.
+        hue (float or tuple of float (min, max)): How much to jitter hue.
+            If float:
+               saturation_factor is chosen uniformly from [-hue, hue]. Should have 0 <= hue <= 0.5.
+            If tuple[float, float]] will be sampled from that range. Both values should be in range [-0.5, 0.5].
+
+    """
+
+    def __init__(
+        self,
+        config,
+        always_apply: bool | None = None,
+        p: float = 0.5,
+    ):
+        super().__init__(p=p, always_apply=always_apply)
+
+        self.config = config
+        self.randstainna = RandStainNA(config)
+
+    def apply(
+        self,
+        img: np.ndarray,
+        **params: Any,
+    ) -> np.ndarray:
+
+        res = self.randstainna(img)
+
+        return res
