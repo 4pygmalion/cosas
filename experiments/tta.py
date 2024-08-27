@@ -52,6 +52,7 @@ class Evaluator(BinaryClassifierTrainer):
         threshold: float = 0.5,
         save_plot: bool = False,
         tta: callable = None,
+        is_return_dict: bool = False,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.
@@ -84,10 +85,13 @@ class Evaluator(BinaryClassifierTrainer):
 
             outputs = tta(xs, self.model) if tta else self.model(xs)
 
-            recon_x = outputs["recon"]
-            logits = outputs["mask"]
-            vector = outputs["vector"]
-            density = outputs["density"]
+            if is_return_dict:
+                recon_x = outputs["recon"]
+                logits = outputs["mask"]
+                vector = outputs["vector"]
+                density = outputs["density"]
+            else:
+                logits = outputs
             logits = logits.view(ys.shape)
             loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
 
@@ -158,6 +162,13 @@ def get_args():
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
     parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
+    parser.add_argument("--use_tta", help="Use rotational tta", action="store_true")
+    parser.add_argument(
+        "--model_return_dict",
+        help="Model return dict type",
+        default=False,
+        action="store_true",
+    )
     return parser.parse_args()
 
 
@@ -229,8 +240,7 @@ def main():
     childrun_ids = get_child_run_ids(args.parent_id)[::-1]  # fold ascending order
 
     summary_metrics = []
-    folds = KFold(n_splits=5, shuffle=True, random_state=42)
-
+    folds = KFold(n_splits=4, shuffle=True, random_state=42)
     with mlflow.start_run(
         run_name=f"TTA_{parent_run_name}", experiment_id=MLFLOW_EXP.experiment_id
     ) as run:
@@ -259,12 +269,14 @@ def main():
             evaluator = Evaluator(
                 model=model, loss=AELoss(False, alpha=1), device=args.device
             )
+
             metrics = process_fold(
                 test_dataloader,
                 fold,
                 evaluator,
                 parent_run_name,
-                tta_fn=rotational_tta,
+                model_return_dict=args.model_return_dict,
+                tta_fn=rotational_tta if args.use_tta else None,
             )
             summary_metrics.append(metrics)
 
