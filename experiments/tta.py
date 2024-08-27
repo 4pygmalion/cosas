@@ -245,6 +245,8 @@ def main():
     with mlflow.start_run(
         run_name=f"TTA_{parent_run_name}", experiment_id=MLFLOW_EXP.experiment_id
     ) as run:
+        mlflow.log_params(args.__dict__)
+
         for fold, (_, test_indices) in enumerate(
             folds.split(cosas_data.images, cosas_data.masks), start=1
         ):
@@ -278,7 +280,6 @@ def main():
             else:
                 tta_fn = rotational_tta
 
-            tta_fn = args.model_return_dict
             metrics = process_fold(
                 test_dataloader,
                 fold,

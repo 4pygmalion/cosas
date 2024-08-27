@@ -20,9 +20,11 @@ COPY setup.py $PROJECTDIR
 
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install -r requirements.txt
+RUN bash ./install_spams.sh
 RUN python3 -m pip install histomicstk --find-links https://girder.github.io/large_image_wheels
 RUN python3 -m pip install SimpleITK
 RUN python3 -m pip install .
+
 
 RUN groupadd -r user && useradd -m --no-log-init -r -g user user
 USER user
