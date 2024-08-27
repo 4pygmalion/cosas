@@ -1,6 +1,7 @@
 import os
 import argparse
 
+import cv2
 import numpy as np
 import torch
 import SimpleITK
@@ -22,7 +23,9 @@ def get_args():
 
 def read_image(path) -> np.ndarray:
     image = SimpleITK.ReadImage(path)
-    return SimpleITK.GetArrayFromImage(image)
+    image_array = SimpleITK.GetArrayFromImage(image)  # BGR
+
+    return cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
 
 
 def preprocess_image(image_array: np.ndarray, device: str):
@@ -50,6 +53,13 @@ def postprocess_image(confidences: torch.Tensor, original_size):
     upsampled_confidences = A.Resize(*original_size)(image=confidences_array)["image"]
 
     pred_mask = (upsampled_confidences >= 0.5).astype(np.uint8)
+
+    mask_ratio = pred_mask.sum() / np.prod(pred_mask.shape)
+    if mask_ratio <= 0.05:
+        return np.zeros_like(pred_mask, dtype=np.uint8)
+
+    elif mask_ratio >= 0.95:
+        return np.ones_like(pred_mask, dtype=np.uint8)
 
     return pred_mask
 
