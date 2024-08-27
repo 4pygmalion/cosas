@@ -10,7 +10,9 @@ from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
 from segmentation_models_pytorch.base.heads import SegmentationHead, ClassificationHead
 from segmentation_models_pytorch.base.model import SegmentationModel
 from segmentation_models_pytorch.encoders import get_encoder
-from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
+from transformers import (
+    SegformerForSemanticSegmentation,
+)
 from segmentation_models_pytorch.base import modules as md
 
 from cosas.transforms import tesellation, reverse_tesellation
@@ -567,13 +569,15 @@ class MultiTaskTransAE(torch.nn.Module):
 class Segformer(torch.nn.Module):
     def __init__(self):
         super(Segformer, self).__init__()
-        model = SegformerForSemanticSegmentation.from_pretrained(
-            "nvidia/segformer-b0-finetuned-ade-512-512"
+        self.model = SegformerForSemanticSegmentation.from_pretrained(
+            "nvidia/mit-b5", ignore_mismatched_sizes=True
         )
-        model.decode_head.classifier = nn.Conv2d(
-            in_channels=256, out_channels=1, kernel_size=1
+        self.model.decode_head.classifier = torch.nn.Conv2d(
+            768,
+            1,
+            kernel_size=1,
+            stride=1,
         )
-        self.model = model
 
     def forward(self, x: torch.Tensor):
         b, c, w, h = x.shape
