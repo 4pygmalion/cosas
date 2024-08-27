@@ -214,7 +214,7 @@ def tta_softvoting(n_trials: List[Dict[str, torch.Tensor]]):
 
 
 @torch.no_grad()
-def rotational_tta(xs, model, angles=[0, 90, 180, 270]):
+def rotational_tta_dict(xs, model, angles=[0, 90, 180, 270]):
     """배치(xs)에 대해서 TTA을 진행"""
 
     y_hats = []
@@ -231,3 +231,20 @@ def rotational_tta(xs, model, angles=[0, 90, 180, 270]):
     return {
         k: torch.stack([y_hat[k] for y_hat in y_hats], dim=0) for k in y_hats[0].keys()
     }
+
+
+@torch.no_grad()
+def rotational_tta(xs, model, angles=[0, 90, 180, 270]):
+    """배치(xs)에 대해서 TTA을 진행"""
+
+    y_hats = []
+    for x in xs:
+        outputs = []
+        for angle in angles:
+            x_new = rotate(x, angle=angle)
+            outputs.append(model(x_new.unsqueeze(0)))
+
+        y_hat = torch.concat(outputs).mean(dim=0)
+        y_hats.append(y_hat)
+
+    return torch.stack(y_hats, dim=0)

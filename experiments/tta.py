@@ -25,7 +25,7 @@ from cosas.tracking import (
 )
 from cosas.datasets import ImageMaskDataset
 from cosas.metrics import summarize_metrics
-from cosas.misc import rotational_tta
+from cosas.misc import rotational_tta, rotational_tta_dict
 from cosas.normalization import SPCNNormalizer
 
 
@@ -271,13 +271,21 @@ def main():
                 model=model, loss=AELoss(False, alpha=1), device=args.device
             )
 
+            if not args.use_tta:
+                tta_fn = None
+            elif args.model_return_dict:
+                tta_fn = rotational_tta_dict
+            else:
+                tta_fn = rotational_tta
+
+            tta_fn = args.model_return_dict
             metrics = process_fold(
                 test_dataloader,
                 fold,
                 evaluator,
                 parent_run_name,
                 model_return_dict=args.model_return_dict,
-                tta_fn=rotational_tta if args.use_tta else None,
+                tta_fn=tta_fn,
             )
             summary_metrics.append(metrics)
 
