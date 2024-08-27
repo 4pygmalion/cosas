@@ -14,6 +14,7 @@ from sklearn.metrics import roc_auc_score
 
 from .tracking import plot_and_save, log_patch_and_save
 from .metrics import Metrics, AverageMeter, calculate_metrics
+from .stain_seperation.seestaina.misc import od_to_rgb
 
 
 class BaseTrainer(ABC):
@@ -506,7 +507,7 @@ class AETrainer(BinaryClassifierTrainer):
                     )
                     log_patch_and_save(
                         image_name=f"step_{i}_dice_{dice}_iou_{iou}",
-                        original_x=np.array(original_x),
+                        original_x=od_to_rgb(np.array(original_x)),
                         original_y=image_lebels,
                         pred_masks=image_confidences >= 0.5,
                         artifact_dir=f"{phase}_prediction",
