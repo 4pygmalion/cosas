@@ -28,10 +28,9 @@ def read_image(path) -> np.ndarray:
 def preprocess_image(image_array: np.ndarray, device: str):
     """[summary] preprocessing input image into model format"""
 
-    # TODO: 하드코딩이 아니라, A.Compose을 직렬화해서 불러올수 있도록
     transform = A.Compose(
         [
-            A.Resize(384, 384),
+            A.Resize(512, 512),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
@@ -51,14 +50,6 @@ def postprocess_image(confidences: torch.Tensor, original_size):
     upsampled_confidences = A.Resize(*original_size)(image=confidences_array)["image"]
 
     pred_mask = (upsampled_confidences >= 0.5).astype(np.uint8)
-
-    mask_ratio = pred_mask.sum() / np.prod(pred_mask.shape)
-
-    if mask_ratio < 0.05:
-        return np.zeros_like(pred_mask, dtype=np.uint8)
-
-    if mask_ratio >= 0.95:
-        return np.ones_like(pred_mask, dtype=np.uint8)
 
     return pred_mask
 
@@ -99,14 +90,13 @@ def main():
             except Exception as e:
                 print(e)
 
-            original_size = raw_image.shape[:2]
-
             norm_image = normalizer.transform(raw_image)
             x: torch.Tensor = preprocess_image(norm_image, device)
             with torch.no_grad():
                 logit = model(x)
                 confidence: torch.Tensor = torch.sigmoid(logit)
 
+            original_size = raw_image.shape[:2]
             result = postprocess_image(confidence, original_size=original_size)
             write_image(output_path, result)
 
