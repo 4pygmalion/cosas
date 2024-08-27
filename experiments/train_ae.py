@@ -13,7 +13,7 @@ from cosas.paths import DATA_DIR
 from cosas.networks import MultiTaskAE
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
-from cosas.transforms import CopyTransform
+from cosas.transforms import CopyTransform, AUG_REGISTRY
 from cosas.losses import AELoss
 from cosas.misc import set_seed, get_config
 from cosas.trainer import AETrainer
@@ -76,6 +76,9 @@ def get_config() -> argparse.ArgumentParser:
         action="store_true",
         help="use stain noramlization(vahadane)",
         default=False,
+    )
+    parser.add_argument(
+        "--sa", choices=list(AUG_REGISTRY.keys()), help="Use stain augmentation"
     )
     parser.add_argument("--use_task1", action="store_true", default=False)
 
@@ -151,6 +154,10 @@ if __name__ == "__main__":
                 train_images = [normalizer.transform(image) for image in train_images]
                 val_images = [normalizer.transform(image) for image in val_images]
                 test_images = [normalizer.transform(image) for image in test_images]
+
+            if args.sa:
+                aug_fn = AUG_REGISTRY[args.sa]
+                train_image, train_masks = aug_fn(train_images, train_masks)
 
             # Append COSAS Task1 data
             train_images += cosas_data1.images if args.use_task1 else list()
