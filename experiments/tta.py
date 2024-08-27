@@ -93,10 +93,6 @@ class Evaluator(BinaryClassifierTrainer):
             else:
                 logits = outputs
             logits = logits.view(ys.shape)
-            loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
-
-            # metric
-            loss_meter.update(loss.item(), len(ys))
 
             images_confidences = torch.sigmoid(logits)
             flat_confidence = images_confidences.flatten().detach().cpu().numpy()
