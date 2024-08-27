@@ -1,6 +1,7 @@
 import argparse
 from typing import Tuple, List
 
+import cv2
 import numpy as np
 import mlflow
 import albumentations as A
@@ -257,6 +258,11 @@ def main():
             test_images = [cosas_data.images[i] for i in test_indices]
             test_masks = [cosas_data.masks[i] for i in test_indices]
 
+            # 혹시?
+            test_images = [
+                cv2.cvtColor(cosas_data.images[i], cv2.COLOR_RGB2BGR)
+                for i in test_indices
+            ]
             if args.use_sn:
                 test_images = stain_normalization(test_images)
             test_dataloader = prepare_test_dataloader(
