@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y python3 python3-pip libgl1 libglib2.0-0
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get -y update && apt-get install -y gcc python3 python3-pip libgl1-mesa-glx libglib2.0-0 git
+RUN apt-get -y update && apt-get install -y gcc python3 python3-pip libgl1-mesa-glx libglib2.0-0 git libblas-dev liblapack-dev gfortran
+
 
 ENV PROJECTDIR=/opt/app
 WORKDIR $PROJECTDIR
@@ -17,10 +18,12 @@ COPY ./inference.py $PROJECTDIR
 COPY ./requirements.txt $PROJECTDIR
 COPY model.pth $PROJECTDIR
 COPY setup.py $PROJECTDIR
+COPY ./install_spams.sh $PROJECTDIR
+COPY ./target_image.png $PROJECTDIR
 
+RUN bash ./install_spams.sh
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install -r requirements.txt
-RUN bash ./install_spams.sh
 RUN python3 -m pip install histomicstk --find-links https://girder.github.io/large_image_wheels
 RUN python3 -m pip install SimpleITK
 RUN python3 -m pip install .
