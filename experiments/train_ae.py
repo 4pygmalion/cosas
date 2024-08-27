@@ -20,6 +20,7 @@ from cosas.trainer import AETrainer
 from cosas.tracking import TRACKING_URI, get_experiment
 from cosas.metrics import summarize_metrics
 from cosas.normalization import find_median_lab_image, SPCNNormalizer
+from cosas.stain_seperation.seestaina.misc import rgb_to_od
 
 EXP_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(EXP_DIR)
@@ -114,6 +115,9 @@ if __name__ == "__main__":
 
     cosas_data2 = COSASData(DATA_DIR, task=1)
     cosas_data2.load()
+
+    # Optical density로 변경(Multi-task이용)
+    cosas_data2.images = [rgb_to_od(image) for image in cosas_data2.images]
 
     if args.use_task1:
         cosas_data1 = COSASData(DATA_DIR, task=1)
