@@ -98,9 +98,11 @@ def main():
             original_size = raw_image.shape[:2]
 
             x: torch.Tensor = preprocess_image(raw_image, device)
-            confidences: torch.Tensor = rotational_tta(x, model)["mask"]  # with no_grad
-            # confidences: torch.Tensor = model(x)["mask"]
-            result = postprocess_image(confidences, original_size=original_size)
+            logit: torch.Tensor = rotational_tta(x, model)["mask"]  # with no_grad
+            confidence: torch.Tensor = torch.sigmoid(logit)
+
+            # confidences: torch.Tensor = model(x)["mask"]  # without TTA
+            result = postprocess_image(confidence, original_size=original_size)
             write_image(output_path, result)
 
 
