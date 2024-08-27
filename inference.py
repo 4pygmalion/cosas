@@ -5,9 +5,10 @@ import numpy as np
 import torch
 import SimpleITK
 import albumentations as A
+from PIL import Image
 from albumentations.pytorch.transforms import ToTensorV2
 
-from cosas.misc import rotational_tta
+from cosas.normalization import SPCNNormalizer
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -86,6 +87,9 @@ def main():
     model_path = os.path.join(CURRENT_DIR, "model.pth")
     model = torch.load(model_path).eval().to(device)
 
+    normalizer = SPCNNormalizer()
+    target_image = np.array(Image.open("target_image.png"))
+    normalizer.fit(target_image)
     for filename in os.listdir(input_dir):
         if filename.endswith(".mha"):
             output_path = os.path.join(output_dir, filename)
@@ -97,10 +101,12 @@ def main():
 
             original_size = raw_image.shape[:2]
 
-            x: torch.Tensor = preprocess_image(raw_image, device)
-            logit: torch.Tensor = rotational_tta(x, model)["mask"]  # with no_grad
-            confidence: torch.Tensor = torch.sigmoid(logit)
-            # confidences: torch.Tensor = model(x)["mask"]  # without TTA
+            norm_image = normalizer.transform(raw_image)
+            x: torch.Tensor = preprocess_image(norm_image, device)
+            with torch.no_grad():
+                logit = model(x)
+                confidence: torch.Tensor = torch.sigmoid(logit)
+
             result = postprocess_image(confidence, original_size=original_size)
             write_image(output_path, result)
 
