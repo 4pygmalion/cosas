@@ -52,7 +52,7 @@ class Evaluator(BinaryClassifierTrainer):
         threshold: float = 0.5,
         save_plot: bool = False,
         tta: callable = None,
-        is_return_dict: bool = False,
+        model_return_dict: bool = False,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.
@@ -85,7 +85,7 @@ class Evaluator(BinaryClassifierTrainer):
 
             outputs = tta(xs, self.model) if tta else self.model(xs)
 
-            if is_return_dict:
+            if model_return_dict:
                 recon_x = outputs["recon"]
                 logits = outputs["mask"]
                 vector = outputs["vector"]
@@ -212,6 +212,7 @@ def process_fold(
     fold,
     evaluator,
     parent_run_name,
+    model_return_dict,
     tta_fn: callable = None,
 ):
     with mlflow.start_run(
@@ -221,7 +222,11 @@ def process_fold(
     ):
 
         test_loss, test_metrics = evaluator.run_epoch(
-            test_dataloader, threshold=0.5, tta=tta_fn, save_plot=True
+            test_dataloader,
+            threshold=0.5,
+            tta=tta_fn,
+            save_plot=True,
+            model_return_dict=model_return_dict,
         )
 
         mlflow.log_metric("test_loss", test_loss.avg)
