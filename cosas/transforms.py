@@ -383,6 +383,32 @@ class GridElasticTransform(A.DualTransform):
         return ("n_grid_width", "n_grid_height", "magnitude")
 
 
+class RGBToOD(A.ImageOnlyTransform):
+    def __init__(self, always_apply=False, p=1.0, max_intensity: int = 255):
+        super(RGBToOD, self).__init__(always_apply, p)
+        self.max_intensity = max_intensity
+
+    def apply(self, image: np.ndarray, **params) -> np.ndarray:
+        clip = np.clip(image, 1e-5, self.max_intensity)
+        return -np.log(clip / self.max_intensity)
+
+    def get_transform_init_args_names(self):
+        return ("max_intensity",)
+
+
+class ODToRGB(A.ImageOnlyTransform):
+    def __init__(self, always_apply=False, p=1.0):
+        super(ODToRGB, self).__init__(always_apply, p)
+
+    def apply(self, image: np.ndarray, **params) -> np.ndarray:
+        array = np.exp(-image)
+        rgb_array = (array * 255).astype(np.uint8)
+        return rgb_array
+
+    def get_transform_init_args_names(self):
+        return ()
+
+
 def get_randstainna_params(images: List[np.ndarray]) -> dict:
     """
 

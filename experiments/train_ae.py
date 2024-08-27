@@ -13,7 +13,7 @@ from cosas.paths import DATA_DIR
 from cosas.networks import MultiTaskAE
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
-from cosas.transforms import CopyTransform, AUG_REGISTRY
+from cosas.transforms import CopyTransform, AUG_REGISTRY, RGBToOD
 from cosas.losses import AELoss
 from cosas.misc import set_seed, get_config
 from cosas.trainer import AETrainer
@@ -89,6 +89,7 @@ def get_config() -> argparse.ArgumentParser:
 def get_transforms(input_size):
     train_transform = A.Compose(
         [
+            RGBToOD(),
             A.Resize(input_size, input_size),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
@@ -100,6 +101,7 @@ def get_transforms(input_size):
     )
     test_transform = A.Compose(
         [
+            RGBToOD(),
             A.Resize(input_size, input_size),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
@@ -115,9 +117,6 @@ if __name__ == "__main__":
 
     cosas_data2 = COSASData(DATA_DIR, task=1)
     cosas_data2.load()
-
-    # Optical density로 변경(Multi-task이용)
-    cosas_data2.images = [rgb_to_od(image) for image in cosas_data2.images]
 
     if args.use_task1:
         cosas_data1 = COSASData(DATA_DIR, task=1)
