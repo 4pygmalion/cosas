@@ -100,7 +100,6 @@ def main():
             x: torch.Tensor = preprocess_image(raw_image, device)
             logit: torch.Tensor = rotational_tta(x, model)["mask"]  # with no_grad
             confidence: torch.Tensor = torch.sigmoid(logit)
-
             # confidences: torch.Tensor = model(x)["mask"]  # without TTA
             result = postprocess_image(confidence, original_size=original_size)
             write_image(output_path, result)
