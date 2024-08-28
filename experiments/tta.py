@@ -119,6 +119,7 @@ class Evaluator(BinaryClassifierTrainer):
                         image_confidences.ravel(),
                         image_lebels.ravel(),
                         threshold=threshold,
+                        postprocess=postprocess,
                     )
                     dice = round(instance_metrics["dice"], 4)
                     iou = round(instance_metrics["iou"], 4)
