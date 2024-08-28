@@ -126,7 +126,7 @@ if __name__ == "__main__":
     with mlflow.start_run(
         experiment_id=experiment.experiment_id, run_name=args.run_name
     ) as run:
-        folds = StratifiedKFold(n_splits=4, shuffle=False)
+        folds = StratifiedKFold(n_splits=4, random_state=args.seed, shuffle=True)
         mlflow.log_params(args.__dict__)
         mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"), artifact_path="cosas")
         mlflow.log_artifact(os.path.abspath(__file__))

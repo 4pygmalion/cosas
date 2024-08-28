@@ -254,7 +254,7 @@ def main():
     childrun_ids = get_child_run_ids(args.parent_id)[::-1]  # fold ascending order
 
     summary_metrics = []
-    folds = StratifiedKFold(n_splits=4, shuffle=False)
+    folds = StratifiedKFold(n_splits=4, random_state=args.seed, shuffle=True)
     with mlflow.start_run(
         run_name=f"TTA_{parent_run_name}", experiment_id=MLFLOW_EXP.experiment_id
     ) as run:
