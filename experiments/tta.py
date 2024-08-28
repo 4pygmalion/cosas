@@ -9,7 +9,7 @@ from PIL import Image
 from progress.bar import Bar
 from torchvision.transforms import ToPILImage
 from torch.utils.data import DataLoader
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 from albumentations.pytorch.transforms import ToTensorV2
 
 from cosas.metrics import AverageMeter, Metrics, calculate_metrics
@@ -254,14 +254,14 @@ def main():
     childrun_ids = get_child_run_ids(args.parent_id)[::-1]  # fold ascending order
 
     summary_metrics = []
-    folds = KFold(n_splits=4, shuffle=True, random_state=42)
+    folds = StratifiedKFold(n_splits=4, shuffle=False)
     with mlflow.start_run(
         run_name=f"TTA_{parent_run_name}", experiment_id=MLFLOW_EXP.experiment_id
     ) as run:
         mlflow.log_params(args.__dict__)
 
-        for fold, (_, test_indices) in enumerate(
-            folds.split(cosas_data.images, cosas_data.masks), start=1
+        for fold, (train_val_indices, test_indices) in enumerate(
+            folds.split(cosas_data2.images, cosas_data2.domain_indices), start=1
         ):
             child_run_id = childrun_ids[fold - 1]
             child_run = mlflow.get_run(child_run_id)
