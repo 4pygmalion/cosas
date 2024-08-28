@@ -6,10 +6,7 @@ import numpy as np
 import torch
 import SimpleITK
 import albumentations as A
-from PIL import Image
 from albumentations.pytorch.transforms import ToTensorV2
-
-from cosas.normalization import SPCNNormalizer
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -33,7 +30,7 @@ def preprocess_image(image_array: np.ndarray, device: str):
 
     transform = A.Compose(
         [
-            A.Resize(512, 512),
+            A.Resize(384, 384),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
@@ -88,9 +85,9 @@ def main():
     model_path = os.path.join(CURRENT_DIR, "model.pth")
     model = torch.load(model_path).eval().to(device)
 
-    normalizer = SPCNNormalizer()
-    target_image = np.array(Image.open("target_image.png"))
-    normalizer.fit(target_image)
+    # normalizer = SPCNNormalizer()
+    # target_image = np.array(Image.open("target_image.png"))
+    # normalizer.fit(target_image)
     for filename in os.listdir(input_dir):
         if filename.endswith(".mha"):
             output_path = os.path.join(output_dir, filename)
@@ -100,10 +97,10 @@ def main():
             except Exception as e:
                 print(e)
 
-            norm_image = normalizer.transform(raw_image)
-            x: torch.Tensor = preprocess_image(norm_image, device)
+            # norm_image = normalizer.transform(raw_image)
+            x: torch.Tensor = preprocess_image(raw_image, device)
             with torch.no_grad():
-                logit = model(x)
+                logit = model(x)["mask"]
                 confidence: torch.Tensor = torch.sigmoid(logit)
 
             original_size = raw_image.shape[:2]
