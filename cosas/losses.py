@@ -81,6 +81,9 @@ class MCCLosswithLogits(torch.nn.Module):
 
 
         """
+        if targets.sum() == 0:
+            return 0
+
         pred = torch.sigmoid(logits)
         tp = torch.sum(torch.mul(pred, targets))
         tn = torch.sum(torch.mul((1 - pred), (1 - targets)))
