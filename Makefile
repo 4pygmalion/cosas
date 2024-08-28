@@ -7,7 +7,7 @@ build:
 		exit 1; \
 	fi
 	cp ${MODEL_PATH} ./model.pth
-	docker build -t $(IMAGE_NAME) .
+	docker build --no-cache -t $(IMAGE_NAME) .
 
 .PHONY: test_run
 test_run:
