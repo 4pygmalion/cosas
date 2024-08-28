@@ -253,6 +253,7 @@ class AELoss(torch.nn.Module):
 
 
 LOSS_REGISTRY = {
+    "bce": torch.nn.BCEWithLogitsLoss,
     "dicebce": DiceXentropy,
     "dice": DiceLoss,
     "mcc": MCCLosswithLogits,
