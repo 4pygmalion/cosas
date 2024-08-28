@@ -261,7 +261,7 @@ def main():
         mlflow.log_params(args.__dict__)
 
         for fold, (train_val_indices, test_indices) in enumerate(
-            folds.split(cosas_data2.images, cosas_data2.domain_indices), start=1
+            folds.split(cosas_data.images, cosas_data.domain_indices), start=1
         ):
             child_run_id = childrun_ids[fold - 1]
             child_run = mlflow.get_run(child_run_id)
