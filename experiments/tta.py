@@ -159,6 +159,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--parent_id", type=str, required=True)
     parser.add_argument("-t", "--task", type=int, required=True, help="Task number")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
     parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
