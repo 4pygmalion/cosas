@@ -133,8 +133,11 @@ def calculate_metrics(
     confidences: np.ndarray,
     targets: np.ndarray,
     threshold=0.5,
+    postprocess: callable = None,
 ) -> Dict[str, float]:
-    pred_label = confidences >= threshold
+    pred_label = (confidences >= threshold).astype(np.uint8)
+    if postprocess:
+        pred_label = postprocess(pred_label)
 
     f1 = f1_score(targets, pred_label)
     acc = accuracy_score(targets, pred_label)

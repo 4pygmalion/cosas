@@ -10,6 +10,7 @@ from PIL import Image
 from albumentations.pytorch.transforms import ToTensorV2
 
 from cosas.normalization import SPCNNormalizer
+from cosas.transforms import discard_minor_prediction
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -54,14 +55,7 @@ def postprocess_image(confidences: torch.Tensor, original_size):
 
     pred_mask = (upsampled_confidences >= 0.5).astype(np.uint8)
 
-    mask_ratio = pred_mask.sum() / np.prod(pred_mask.shape)
-    if mask_ratio <= 0.05:
-        return np.zeros_like(pred_mask, dtype=np.uint8)
-
-    elif mask_ratio >= 0.95:
-        return np.ones_like(pred_mask, dtype=np.uint8)
-
-    return pred_mask
+    return discard_minor_prediction(pred_mask)
 
 
 def write_image(path, result):
