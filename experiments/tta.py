@@ -163,7 +163,7 @@ def get_args():
     parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
     parser.add_argument("--use_tta", help="Use rotational tta", action="store_true")
     parser.add_argument(
-        "--postprocessing",
+        "--postprocess",
         type=str,
         choices=list(POSTPROCESS_REGISTRY.keys()),
         default=None,
