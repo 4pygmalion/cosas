@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
             if args.sa:
                 aug_fn = AUG_REGISTRY[args.sa]
-                train_image, train_masks = aug_fn(train_images, train_masks)
+                train_images, train_masks = aug_fn(train_images, train_masks)
 
             # Append COSAS Task1 data
             train_images += cosas_data1.images if args.use_task1 else list()
