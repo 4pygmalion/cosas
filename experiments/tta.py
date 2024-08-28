@@ -27,6 +27,7 @@ from cosas.datasets import ImageMaskDataset
 from cosas.metrics import summarize_metrics
 from cosas.misc import rotational_tta, rotational_tta_dict
 from cosas.normalization import SPCNNormalizer
+from cosas.transforms import POSTPROCESS_REGISTRY
 
 
 MODEL_URI = "file:///vast/AI_team/mlflow_artifact/13/{run_id}/artifacts/model"
@@ -52,6 +53,7 @@ class Evaluator(BinaryClassifierTrainer):
         threshold: float = 0.5,
         save_plot: bool = False,
         tta: callable = None,
+        postprocess: callable = None,
         model_return_dict: bool = False,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
@@ -103,6 +105,7 @@ class Evaluator(BinaryClassifierTrainer):
                     flat_confidence,
                     ground_truths,
                     threshold=threshold,
+                    postprocess=postprocess,
                 )
             )
 
@@ -116,6 +119,7 @@ class Evaluator(BinaryClassifierTrainer):
                         image_confidences.ravel(),
                         image_lebels.ravel(),
                         threshold=threshold,
+                        postprocess=postprocess,
                     )
                     dice = round(instance_metrics["dice"], 4)
                     iou = round(instance_metrics["iou"], 4)
@@ -159,6 +163,13 @@ def get_args():
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size")
     parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
     parser.add_argument("--use_tta", help="Use rotational tta", action="store_true")
+    parser.add_argument(
+        "--postprocess",
+        type=str,
+        choices=list(POSTPROCESS_REGISTRY.keys()),
+        default=None,
+        help="Use postprocessing",
+    )
     parser.add_argument(
         "--model_return_dict",
         help="Model return dict type",
@@ -206,8 +217,9 @@ def prepare_test_dataloader(test_images, test_masks, input_size, batch_size, dev
 def process_fold(
     test_dataloader,
     fold,
-    evaluator,
+    evaluator: Evaluator,
     parent_run_name,
+    postprocess,
     model_return_dict,
     tta_fn: callable = None,
 ):
@@ -221,6 +233,7 @@ def process_fold(
             test_dataloader,
             threshold=0.5,
             tta=tta_fn,
+            postprocess=postprocess,
             save_plot=True,
             model_return_dict=model_return_dict,
         )
@@ -280,11 +293,15 @@ def main():
             else:
                 tta_fn = rotational_tta
 
+            if args.postprocess:
+                postprocess = POSTPROCESS_REGISTRY[args.postprocess]
+
             metrics = process_fold(
                 test_dataloader,
                 fold,
                 evaluator,
                 parent_run_name,
+                postprocess=postprocess,
                 model_return_dict=args.model_return_dict,
                 tta_fn=tta_fn,
             )

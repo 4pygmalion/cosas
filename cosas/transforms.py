@@ -606,8 +606,26 @@ def aug_mix(
     return new_images, new_masks
 
 
+def discard_minor_prediction(pred_mask: np.ndarray, ratio=0.05):
+    if pred_mask.dtype != np.uint8:
+        raise ValueError(f"type must be np.uint8, passed {pred_mask.dtype}")
+
+    mask_ratio = pred_mask.sum() / np.prod(pred_mask.shape)
+    if mask_ratio <= ratio:
+        return np.zeros_like(pred_mask, dtype=np.uint8)
+
+    elif mask_ratio >= 1 - ratio:
+        return np.ones_like(pred_mask, dtype=np.uint8)
+
+    return pred_mask
+
+
 AUG_REGISTRY = {
     "randstainna": augmentation_randstainna,
     "stain_sep": augmentation_stain_seperation,
     "mix": aug_mix,
+}
+
+POSTPROCESS_REGISTRY = {
+    "discard_minor": discard_minor_prediction,
 }
