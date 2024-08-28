@@ -84,7 +84,7 @@ if __name__ == "__main__":
                 )
             if args.sa:
                 aug_fn = AUG_REGISTRY[args.sa]
-                train_image, train_masks = aug_fn(train_images, train_masks)
+                train_images, train_masks = aug_fn(train_images, train_masks)
 
             train_transform, test_transform = get_transforms(args.input_size)
             dataset = DATASET_REGISTRY[args.dataset]
