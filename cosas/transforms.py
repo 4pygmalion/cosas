@@ -553,8 +553,10 @@ def augmentation_stain_seperation(
     for _ in range(multiple):
         for image, mask in zip(train_images, train_masks):
             new_images.append(
-                augmentor.image_augmentation_with_stain_vector(
-                    image, aug_saturation=True, aug_density=True, aug_value=True
+                np.array(
+                    augmentor.image_augmentation_with_stain_vector(
+                        image, aug_saturation=True, aug_density=True, aug_value=True
+                    )
                 )
             )
             new_masks.append(mask)
@@ -587,8 +589,10 @@ def aug_mix(
     for _ in range(multiple):
         for image, mask in zip(train_images, train_masks):
             if random.random() >= 0.5:
-                new_image = augmentor.image_augmentation_with_stain_vector(
-                    image, aug_saturation=True, aug_density=True, aug_value=True
+                new_image = np.array(
+                    augmentor.image_augmentation_with_stain_vector(
+                        image, aug_saturation=True, aug_density=True, aug_value=True
+                    )
                 )
             else:
                 new_image = randstainna(image)
