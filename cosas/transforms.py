@@ -531,7 +531,7 @@ def augmentation_randstainna(
     new_masks = list()
     for _ in range(multiple):
         for image, mask in zip(train_images, train_masks):
-            new_images.append(ranstainna(image))
+            new_images.append(cv2.cvtColor(ranstainna(image), code=cv2.COLOR_BGR2RGB))
             new_masks.append(mask)
 
     new_images.extend(train_images)
@@ -595,7 +595,7 @@ def aug_mix(
                     )
                 )
             else:
-                new_image = randstainna(image)
+                new_image = cv2.cvtColor(randstainna(image), code=cv2.COLOR_BGR2RGB)
 
             new_images.append(new_image)
             new_masks.append(mask)
