@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
-from cosas.networks import MultiTaskAE
+from cosas.networks import MultiTaskAE, MODEL_REGISTRY
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import CopyTransform, AUG_REGISTRY
@@ -52,7 +52,11 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser.add_argument("--input_size", type=int, help="Image size", required=True)
     parser.add_argument(
-        "--model_name", type=str, help="Model name", default="autoencoder"
+        "--model_name",
+        type=str,
+        help="Model name",
+        default="autoencoder",
+        choices=list(MODEL_REGISTRY.keys()),
     )
     arch_choices = [
         "Unet",
@@ -66,8 +70,10 @@ def get_config() -> argparse.ArgumentParser:
         "PAN",
         "TransUNet",
     ]
-    parser.add_argument("--architecture", type=str, required=True, choices=arch_choices)
-    parser.add_argument("--encoder_name", type=str, required=True)
+    parser.add_argument(
+        "--architecture", type=str, required=False, choices=arch_choices
+    )
+    parser.add_argument("--encoder_name", type=str, required=False)
 
     parser.add_argument("--use_sparisty_loss", action="store_true", default=False)
     parser.add_argument("--alpha", type=float, default=1.0)
@@ -187,11 +193,16 @@ if __name__ == "__main__":
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
             # MODEL
-            model = MultiTaskAE(
-                architecture=args.architecture,
-                encoder_name=args.encoder_name,
-                input_size=(args.input_size, args.input_size),
-            ).to(args.device)
+            if args.model_name:
+                model = MODEL_REGISTRY[args.model_name]()
+            else:
+                model = MultiTaskAE(
+                    architecture=args.architecture,
+                    encoder_name=args.encoder_name,
+                    input_size=(args.input_size, args.input_size),
+                )
+
+            model = model.to(args.device)
             dp_model = torch.nn.DataParallel(model)
 
             trainer = AETrainer(

@@ -1,5 +1,6 @@
 from typing import Optional, List, Union
 
+from copy import deepcopy
 import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
@@ -848,6 +849,83 @@ class Siamformer(torch.nn.Module):
         )
 
 
+class MultiTaskSegformer(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        model = SegformerForSemanticSegmentation.from_pretrained(
+            "nvidia/mit-b5", ignore_mismatched_sizes=True
+        )
+        self.encoder = model.segformer.encoder
+        self.stain_matrix_decoder = deepcopy(model.decode_head)
+        self.stain_matrix_decoder.classifier = torch.nn.Conv2d(
+            768,
+            6,
+            kernel_size=1,
+            stride=1,
+        )
+
+        self.stain_density_decoder = deepcopy(model.decode_head)
+        self.stain_density_decoder.classifier = torch.nn.Conv2d(
+            768,
+            2,
+            kernel_size=1,
+            stride=1,
+        )
+
+        self.mask_head = torch.nn.Sequential(
+            torch.nn.Conv2d(8, 8, kernel_size=1, stride=1),
+            torch.nn.Conv2d(8, 1, kernel_size=1, stride=1),
+        )
+
+    def reconstruction(self, x):
+        w, h = x.shape[-2:]
+        z = self.encoder(
+            x,
+            output_hidden_states=True,
+        ).hidden_states
+
+        # Stain vectors (B, 2, 3, W, H)
+        x = self.stain_matrix_decoder(z)  # (1, 6, W, H)
+        stain_matrix = x.view(-1, 2, 3, int(w / 4), int(h / 4))  # (B, 2, 3, W, H)
+
+        # Stain Density (B, 2, W, H)
+        stain_density = self.stain_density_decoder(z)  # (B, 2, W, H)
+        recon = torch.einsum("bscwh,bswh->bcwh", stain_matrix, stain_density)
+
+        return {"recon": recon, "vector": stain_matrix, "denisty": stain_density}
+
+    def forward(self, x):
+        w, h = x.shape[-2:]
+
+        z_w, z_h = int(w / 4), int(h / 4)
+
+        output = self.reconstruction(x)
+        recon = output["recon"]
+        vector = output["vector"]
+        density = output["denisty"]
+
+        batch_size = x.shape[0]
+        stain_info = torch.concat(
+            [
+                vector.view(batch_size, -1, z_w, z_h),
+                density.view(batch_size, -1, z_w, z_h),
+            ],
+            axis=1,
+        )
+
+        return {
+            "recon": torch.nn.functional.interpolate(
+                recon, size=(w, h), mode="bilinear"
+            ),
+            "mask": torch.nn.functional.interpolate(
+                self.mask_head(stain_info), size=(w, h), mode="bilinear"
+            ),
+            "vector": output["vector"],
+            "density": output["denisty"],
+        }
+
+
 MODEL_REGISTRY = {
     "pyramid": PyramidSeg,
     "transunet": TransUNet,
@@ -855,4 +933,5 @@ MODEL_REGISTRY = {
     "segformer": Segformer,
     "transpose_unet": TransposeUnet,
     "siamformer": Siamformer,
+    "multitask_segformer": MultiTaskSegformer,
 }
