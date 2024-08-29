@@ -35,9 +35,9 @@ class IoULoss(torch.nn.Module):
         self.smooth = smooth
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor):
-        logits = torch.sigmoid(logits)
-        intersection = (logits * targets).sum()
-        total = (logits + targets).sum()
+        confidences = torch.sigmoid(logits)
+        intersection = (confidences * targets).sum()
+        total = (confidences + targets).sum()
         union = total - intersection
         iou_score = (intersection + self.smooth) / (union + self.smooth)
         return 1 - iou_score
@@ -254,6 +254,7 @@ class AELoss(torch.nn.Module):
 
 LOSS_REGISTRY = {
     "bce": torch.nn.BCEWithLogitsLoss,
+    "iou": IoULoss,
     "dicebce": DiceXentropy,
     "dice": DiceLoss,
     "mcc": MCCLosswithLogits,
