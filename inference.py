@@ -94,8 +94,8 @@ def main():
             except Exception as e:
                 print(e)
 
-            norm_image = normalizer.transform(raw_image)
-            x: torch.Tensor = preprocess_image(norm_image, device)
+            # norm_image = normalizer.transform(raw_image)
+            x: torch.Tensor = preprocess_image(raw_image, device)
             with torch.no_grad():
                 logit = model(x)
                 confidence: torch.Tensor = torch.sigmoid(logit)
