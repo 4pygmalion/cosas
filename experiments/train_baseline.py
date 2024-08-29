@@ -46,7 +46,7 @@ if __name__ == "__main__":
     args = get_config()
     set_seed(42)
 
-    cosas_data = COSASData(DATA_DIR, task=2)
+    cosas_data = COSASData(DATA_DIR, task=args.task)
     cosas_data.load()
 
     mlflow.set_tracking_uri(TRACKING_URI)

@@ -34,6 +34,7 @@ def get_config() -> argparse.ArgumentParser:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("--run_name", type=str, default="baseline", help="Run name")
+    parser.add_argument("--task", type=int, help="Task number", default=2)
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--epochs", type=int, default=200, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
