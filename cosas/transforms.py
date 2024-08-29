@@ -555,7 +555,11 @@ def augmentation_stain_seperation(
             new_images.append(
                 np.array(
                     augmentor.image_augmentation_with_stain_vector(
-                        image, aug_saturation=True, aug_density=True, aug_value=True
+                        image,
+                        aug_saturation=True,
+                        aug_density=True,
+                        aug_value=True,
+                        p=1,
                     )
                 )
             )
@@ -568,7 +572,7 @@ def augmentation_stain_seperation(
 
 
 def aug_mix(
-    train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
+    train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 1
 ) -> List[np.ndarray]:
     from .stain_seperation.seestaina.structure_preversing import Augmentor
     from .transforms import (
@@ -591,7 +595,11 @@ def aug_mix(
             if random.random() >= 0.5:
                 new_image = np.array(
                     augmentor.image_augmentation_with_stain_vector(
-                        image, aug_saturation=True, aug_density=True, aug_value=True
+                        image,
+                        aug_saturation=True,
+                        aug_density=True,
+                        aug_value=True,
+                        p=1,
                     )
                 )
             else:
