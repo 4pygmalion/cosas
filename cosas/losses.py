@@ -232,7 +232,7 @@ class SparsityLoss(nn.Module):
 
 
 class ReconMCCLoss(torch.nn.Module):
-    def __init__(self, use_sparisty_loss: bool, alpha: float = 1):
+    def __init__(self, use_sparisty_loss: bool = False, alpha: float = 1):
         super(ReconMCCLoss, self).__init__()
         self.mcc = MCCLosswithLogits()
         self.sparsity_loss = SparsityLoss()
