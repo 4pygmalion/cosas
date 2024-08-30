@@ -115,7 +115,7 @@ class Evaluator(BinaryClassifierTrainer):
                 log_patch_and_save_by_batch(xs, ys, images_confidences, phase=phase)
 
             bar.suffix = self.make_bar_sentence(
-                phase="test",
+                phase=phase,
                 epoch=0,
                 step=step,
                 total_step=total_step,
