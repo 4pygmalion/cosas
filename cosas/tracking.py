@@ -7,7 +7,9 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
+from .transforms import de_normalization
 from .misc import plot_xypred, plot_patch_xypred
+from .metrics import calculate_metrics
 
 
 TRACKING_URI = "http://219.252.39.224:5000/"
@@ -98,3 +100,36 @@ def log_patch_and_save(
     mlflow.log_artifact(temp_save_path, artifact_dir)
 
     os.remove(temp_save_path)
+
+
+def log_patch_and_save_by_batch(
+    batch_xs: torch.Tensor,
+    batch_ys: torch.Tensor,
+    batch_confidences: torch.Tensor,
+    phase: str,
+    threshold=0.5,
+) -> None:
+
+    for i, (x, y, confidence) in enumerate(zip(batch_xs, batch_ys, batch_confidences)):
+        image_confidence = confidence.detach().cpu().numpy()
+        image_label = y.detach().cpu().numpy()
+        instance_metrics = calculate_metrics(
+            image_confidence.ravel(),
+            image_label.ravel(),
+            threshold=threshold,
+        )
+        dice = round(instance_metrics["dice"], 4)
+        iou = round(instance_metrics["iou"], 4)
+
+        original_x = de_normalization(normalized_image=x.permute(1, 2, 0).cpu().numpy())
+
+        log_patch_and_save(
+            image_name=f"step_{i}_dice_{dice}_iou_{iou}",
+            original_x=original_x,
+            original_y=image_label,
+            pred_masks=image_confidence >= 0.5,
+            artifact_dir=f"{phase}_prediction",
+        )
+        i += 1
+
+    return
