@@ -118,7 +118,7 @@ if __name__ == "__main__":
     args = get_config()
     set_seed(42)
 
-    cosas_data2 = COSASData(DATA_DIR, task=1)
+    cosas_data2 = COSASData(DATA_DIR, task=2)
     cosas_data2.load()
 
     if args.use_task1:
