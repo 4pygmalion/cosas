@@ -118,7 +118,7 @@ class BinaryClassifierTrainer(ABC):
         if phase == "train":
             self.model.train()
         else:
-            self.model.eval
+            self.model.eval()
 
         total_step = len(dataloader)
         bar = Bar(max=total_step, check_tty=False)
@@ -418,7 +418,7 @@ class AETrainer(BinaryClassifierTrainer):
         if phase == "train":
             self.model.train()
         else:
-            self.model.eval
+            self.model.eval()
 
         total_step = len(dataloader)
         bar = Bar(max=total_step, check_tty=False)
