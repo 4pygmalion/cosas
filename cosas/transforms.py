@@ -248,39 +248,38 @@ class CopyTransform(A.DualTransform):
         return ()
 
 
-def get_transforms(input_size, randstainna_transform):
-    train_transform = A.Compose(
-        [
-            A.Resize(input_size, input_size),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
-            A.OneOf(
-                [
-                    A.ColorJitter(
-                        brightness=(0.9, 1.1),
-                        contrast=(0.9, 1.0),
-                        hue=(-0.07, 0.07),
-                        saturation=(0.9, 1.1),
-                    ),
-                    A.ToGray(),
-                ]
-            ),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            randstainna_transform,
-            CopyTransform(p=1),
-            ToTensorV2(),
-        ]
-    )
-    test_transform = A.Compose(
-        [
-            A.Resize(input_size, input_size),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            ToTensorV2(),
-        ]
-    )
+def get_transforms(input_size, randstainna_transform=None):
+    train_transform = [
+        A.Resize(input_size, input_size),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.OneOf(
+            [
+                A.ColorJitter(
+                    brightness=(0.9, 1.1),
+                    contrast=(0.9, 1.0),
+                    hue=(-0.07, 0.07),
+                    saturation=(0.9, 1.1),
+                ),
+                A.ToGray(),
+            ]
+        ),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        CopyTransform(p=1),
+        ToTensorV2(),
+    ]
 
-    return train_transform, test_transform
+    if randstainna_transform is not None:
+        train_transform.insert(-3, randstainna_transform)
+
+    test_transform = [
+        A.Resize(input_size, input_size),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ]
+
+    return A.Compose(train_transform), A.Compose(test_transform)
 
 
 class GridElasticTransform(A.DualTransform):

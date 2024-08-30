@@ -83,16 +83,20 @@ if __name__ == "__main__":
                 train_images, val_images, test_images = stain_normalization(
                     train_images, val_images, test_images
                 )
+
+            train_transform, test_transform = get_transforms(args.input_size)
+            # Augmentation settings
             if args.sa == "augmentation_randstainna":
+                randstainna_transform = RandStainNATransform()
+                randstainna_transform.fit(train_images)
+
+                train_transform, test_transform = get_transforms(
+                    args.input_size, randstainna_transform
+                )
+            elif args.sa:
                 aug_fn = AUG_REGISTRY[args.sa]
                 train_images, train_masks = aug_fn(train_images, train_masks)
 
-            randstainna_transform = RandStainNATransform()
-            randstainna_transform.fit(train_images)
-
-            train_transform, test_transform = get_transforms(
-                args.input_size, randstainna_transform
-            )
             dataset = DATASET_REGISTRY[args.dataset]
             train_dataset = dataset(
                 train_images, train_masks, train_transform, device=args.device
