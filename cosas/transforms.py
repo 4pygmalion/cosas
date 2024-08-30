@@ -8,9 +8,46 @@ import torch
 import albumentations as A
 from PIL import Image
 from torchvision.transforms.functional import pad
+from torchvision.transforms.functional import to_pil_image
 from albumentations.pytorch.transforms import ToTensorV2
 from histomicstk.preprocessing.color_conversion import rgb_to_lab
+
 from .randstainna.randstainna import RandStainNA, Dict2Class
+
+
+def de_normalization(
+    normalized_image: np.ndarray,
+    mean=[0.485, 0.456, 0.406],
+    sd=[0.229, 0.224, 0.225],
+) -> np.ndarray:
+    """정규화된 이미지를 복원함
+
+    Args:
+        normalized_image (np.ndarray): 정규화된 이미지.
+            이 배열은 (H, W, C) 형태로,  H는 높이, W는 너비, C는 채널 수
+        mean (list, optional): 정규화 시 사용된 평균값. 각 채널에 대한 평균값을 나타내며,
+            기본값은 [0.485, 0.456, 0.406]입니다.
+        sd (list, optional): 정규화 시 사용된 표준편차. 각 채널에 대한 표준편차를 나타내며,
+            기본값은 [0.229, 0.224, 0.225]입니다.
+
+    Returns:
+        np.ndarray: 정규화가 해제된 원본 이미지.
+            이 배열은 (H, W, C) 형태로 반환. np.float32
+
+    Example:
+        >>> _, test_transform = get_transforms(512)
+        >>> aug = test_transform(image=cosas_data.images[0])
+        >>> img = aug["image"].permute(1, 2, 0).numpy()
+        >>> original_x = de_normalization(img)
+        >>> plt.imshow(original_x, vmin=0, vmax=1)
+
+    """
+    broadcast_sd = np.array(sd)[np.newaxis, np.newaxis, :]
+    broadcast_mean = np.array(mean)[np.newaxis, np.newaxis, :]
+
+    original_x = (normalized_image * broadcast_sd) + broadcast_mean
+
+    return original_x
 
 
 def get_image_stats(
