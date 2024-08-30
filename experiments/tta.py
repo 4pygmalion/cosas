@@ -28,8 +28,7 @@ from cosas.metrics import summarize_metrics
 from cosas.misc import rotational_tta, rotational_tta_dict
 from cosas.normalization import SPCNNormalizer
 from cosas.transforms import POSTPROCESS_REGISTRY
-import os
-import os
+from cosas.tracking import log_patch_and_save_by_batch
 
 
 MODEL_URI = "file:///vast/AI_team/mlflow_artifact/13/{run_id}/artifacts/model"
@@ -56,6 +55,7 @@ class Evaluator(BinaryClassifierTrainer):
         save_plot: bool = False,
         tta: callable = None,
         postprocess: callable = None,
+        phase: str = "test",
         model_return_dict: bool = False,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
@@ -112,34 +112,7 @@ class Evaluator(BinaryClassifierTrainer):
             )
 
             if save_plot:
-                for i, (x, y, confidences) in enumerate(
-                    zip(xs, ys, images_confidences)
-                ):
-                    image_confidences = confidences.detach().cpu().numpy()
-                    image_lebels = y.detach().cpu().numpy()
-                    instance_metrics = calculate_metrics(
-                        image_confidences.ravel(),
-                        image_lebels.ravel(),
-                        threshold=threshold,
-                        postprocess=postprocess,
-                    )
-                    dice = round(instance_metrics["dice"], 4)
-                    iou = round(instance_metrics["iou"], 4)
-
-                    mean = [0.485, 0.456, 0.406]
-                    sd = [0.229, 0.224, 0.225]
-                    original_x = ToPILImage()(
-                        x.detach().cpu() * torch.tensor(sd)[:, None, None]
-                        + torch.tensor(mean)[:, None, None]
-                    )
-                    log_patch_and_save(
-                        image_name=f"step_{i}_dice_{dice}_iou_{iou}",
-                        original_x=np.array(original_x),
-                        original_y=image_lebels,
-                        pred_masks=image_confidences >= 0.5,
-                        artifact_dir="test_prediction",
-                    )
-                    i += 1
+                log_patch_and_save_by_batch(xs, ys, images_confidences, phase=phase)
 
             bar.suffix = self.make_bar_sentence(
                 phase="test",
@@ -239,6 +212,7 @@ def process_fold(
             tta=tta_fn,
             postprocess=postprocess,
             save_plot=True,
+            phase="val",
             model_return_dict=model_return_dict,
         )
         mlflow.log_metric("val_loss", val_loss.avg)
@@ -250,6 +224,7 @@ def process_fold(
             tta=tta_fn,
             postprocess=postprocess,
             save_plot=True,
+            phase="test",
             model_return_dict=model_return_dict,
         )
 
