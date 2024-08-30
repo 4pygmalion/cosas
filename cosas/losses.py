@@ -231,9 +231,9 @@ class SparsityLoss(nn.Module):
         return penalty.mean()
 
 
-class AELoss(torch.nn.Module):
+class ReconMCCLoss(torch.nn.Module):
     def __init__(self, use_sparisty_loss: bool, alpha: float = 1):
-        super(AELoss, self).__init__()
+        super(ReconMCCLoss, self).__init__()
         self.mcc = MCCLosswithLogits()
         self.sparsity_loss = SparsityLoss()
         self.use_sparisty_loss = use_sparisty_loss
@@ -252,6 +252,27 @@ class AELoss(torch.nn.Module):
         return loss
 
 
+class ReconIoULoss(torch.nn.Module):
+    def __init__(self, use_sparisty_loss: bool, alpha: float = 1):
+        super(ReconIoULoss, self).__init__()
+        self.iou = IoULoss()
+        self.sparsity_loss = SparsityLoss()
+        self.use_sparisty_loss = use_sparisty_loss
+        self.alpha = alpha
+
+    def forward(self, recon_x, x, logits, targets, vector, desnity):
+        mask_error = self.iou(logits, targets)
+        recon_error = torch.nn.functional.mse_loss(recon_x, x)
+        loss = mask_error + self.alpha * recon_error
+
+        if self.use_sparisty_loss:
+            sparisty_penalty = self.sparsity_loss(vector, desnity)
+            loss += sparisty_penalty
+            return loss
+
+        return loss
+
+
 LOSS_REGISTRY = {
     "bce": torch.nn.BCEWithLogitsLoss,
     "iou": IoULoss,
@@ -259,5 +280,6 @@ LOSS_REGISTRY = {
     "dice": DiceLoss,
     "mcc": MCCLosswithLogits,
     "diceiou": DiceIoU,
-    "multi-task": AELoss,
+    "recon_mcc": ReconMCCLoss,
+    "recon_iou": ReconIoULoss,
 }
