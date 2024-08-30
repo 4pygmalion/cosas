@@ -130,6 +130,5 @@ def log_patch_and_save_by_batch(
             pred_masks=image_confidence >= 0.5,
             artifact_dir=f"{phase}_prediction",
         )
-        i += 1
 
     return

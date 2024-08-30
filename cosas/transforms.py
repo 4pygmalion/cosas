@@ -32,7 +32,7 @@ def de_normalization(
 
     Returns:
         np.ndarray: 정규화가 해제된 원본 이미지.
-            이 배열은 (H, W, C) 형태로 반환. uint8
+            이 배열은 (H, W, C) 형태로 반환. np.float32
 
     Example:
         >>> _, test_transform = get_transforms(512)
