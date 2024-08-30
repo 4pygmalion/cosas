@@ -211,7 +211,7 @@ class CopyTransform(A.DualTransform):
         return ()
 
 
-def get_transforms(input_size):
+def get_transforms(input_size, randstainna_transform):
     train_transform = A.Compose(
         [
             A.Resize(input_size, input_size),
@@ -230,6 +230,7 @@ def get_transforms(input_size):
                 ]
             ),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            randstainna_transform,
             CopyTransform(p=1),
             ToTensorV2(),
         ]
@@ -381,6 +382,53 @@ class GridElasticTransform(A.DualTransform):
 
     def get_transform_init_args_names(self):
         return ("n_grid_width", "n_grid_height", "magnitude")
+
+
+class RandStainNATransform(A.ImageOnlyTransform):
+    """[summary] Applying Albumentation Randstainna augmentation to the image"""
+
+    def __init__(self, always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+
+        randstainna_config = RANDSTAINNA_TEMPLATE.copy()
+        self.randstainna = ConfigRandStainNA(randstainna_config)
+
+    def fit(self, train_images, **params):
+        """[summary] fitting the training images to set up randstainna's config"""
+        color_params = get_randstainna_params(train_images)
+        self.randstainna.config.update(color_params)
+        return
+
+    def apply(self, img, **params):
+        return cv2.cvtColor(self.randstainna(img), code=cv2.COLOR_BGR2RGB)
+
+
+# Deprecated) 위의 RandStainNATransform 클래스로 대체
+# def augmentation_randstainna(
+#     train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
+# ) -> List[np.ndarray]:
+#     from .transforms import (
+#         ConfigRandStainNA,
+#         get_randstainna_params,
+#         RANDSTAINNA_TEMPLATE,
+#     )
+
+#     color_params = get_randstainna_params(train_images)
+#     config = RANDSTAINNA_TEMPLATE.copy()
+#     config.update(color_params)
+#     ranstainna = ConfigRandStainNA(config)
+
+#     new_images = list()
+#     new_masks = list()
+#     for _ in range(multiple):
+#         for image, mask in zip(train_images, train_masks):
+#             new_images.append(cv2.cvtColor(ranstainna(image), code=cv2.COLOR_BGR2RGB))
+#             new_masks.append(mask)
+
+#     new_images.extend(train_images)
+#     new_masks.extend(train_masks)
+
+#     return new_images, new_masks
 
 
 def get_randstainna_params(images: List[np.ndarray]) -> dict:
