@@ -97,21 +97,21 @@ if __name__ == "__main__":
                     stain_separation_transform=None,
                 )
             elif args.sa == "albu_stain_separation":
-                stainsep_transform = StainSeparationTransform()
+                stain_separation_transform = StainSeparationTransform()
                 train_transform, test_transform = get_transforms(
                     args.input_size,
                     randstainna_transform=None,
-                    stainsep_transform=stainsep_transform,
+                    stain_separation_transform=stain_separation_transform,
                 )
             elif args.sa == "albu_mix":
                 randstainna_transform = RandStainNATransform()
                 randstainna_transform.fit(train_images)
 
-                stainsep_transform = StainSeparationTransform()
+                stain_separation_transform = StainSeparationTransform()
                 train_transform, test_transform = get_transforms(
                     args.input_size,
                     randstainna_transform=randstainna_transform,
-                    stainsep_transform=stainsep_transform,
+                    stain_separation_transform=stain_separation_transform,
                 )
             elif args.sa:
                 aug_fn = AUG_REGISTRY[args.sa]
