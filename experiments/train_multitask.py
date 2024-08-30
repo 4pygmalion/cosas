@@ -1,3 +1,12 @@
+"""
+python3 experiments/train_multitask.py \
+    --run_name stain_multitask \
+    --batch_size 32 \
+    --dataset stain \
+    --input_size 512 \
+    --model_name stainsegformer
+"""
+
 import os
 import argparse
 
@@ -14,9 +23,9 @@ from cosas.networks import MultiTaskAE, MODEL_REGISTRY
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import CopyTransform, AUG_REGISTRY
-from cosas.losses import AELoss
+from cosas.losses import StainLoss
 from cosas.misc import set_seed, get_config
-from cosas.trainer import AETrainer
+from cosas.trainer import MultiTaskBinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
 from cosas.metrics import summarize_metrics
 from cosas.normalization import find_median_lab_image, SPCNNormalizer
@@ -42,13 +51,15 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dataset",
         type=str,
-        default="image_mask",
+        default="stain",
+        choices=list(DATASET_REGISTRY.keys()),
+        help="Dataset to use",
         required=False,
     )
-    parser.add_argument("--loss", type=str, default="multi-task", required=False)
+    parser.add_argument("--loss", type=str, default="stain-loss", required=False)
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument(
-        "--n_patience", type=int, default=10, help="Number of patience epochs"
+        "--n_patience", type=int, default=20, help="Number of patience epochs"
     )
     parser.add_argument("--input_size", type=int, help="Image size", required=True)
     parser.add_argument(
@@ -192,22 +203,13 @@ if __name__ == "__main__":
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
-            # MODEL
-            if args.model_name == "autoencoder":
-                model = MultiTaskAE(
-                    architecture=args.architecture,
-                    encoder_name=args.encoder_name,
-                    input_size=(args.input_size, args.input_size),
-                )
-            else:
-                model = MODEL_REGISTRY[args.model_name]()
-
+            model = MODEL_REGISTRY[args.model_name]()
             model = model.to(args.device)
             dp_model = torch.nn.DataParallel(model)
 
-            trainer = AETrainer(
+            trainer = MultiTaskBinaryClassifierTrainer(
                 model=dp_model,
-                loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
+                loss=StainLoss(alpha=args.alpha),
                 optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
                 device=args.device,
             )
