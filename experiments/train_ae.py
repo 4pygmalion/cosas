@@ -13,8 +13,14 @@ from cosas.paths import DATA_DIR
 from cosas.networks import MultiTaskAE, MODEL_REGISTRY
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
-from cosas.transforms import CopyTransform, AUG_REGISTRY
-from cosas.losses import AELoss
+from cosas.transforms import (
+    CopyTransform,
+    AUG_REGISTRY,
+    RandStainNATransform,
+    StainSeparationTransform,
+    AUG_REGISTRY,
+)
+from cosas.losses import LOSS_REGISTRY
 from cosas.misc import set_seed, get_config
 from cosas.trainer import AETrainer
 from cosas.tracking import TRACKING_URI, get_experiment
@@ -45,7 +51,13 @@ def get_config() -> argparse.ArgumentParser:
         default="image_mask",
         required=False,
     )
-    parser.add_argument("--loss", type=str, default="multi-task", required=False)
+    parser.add_argument(
+        "--loss",
+        type=str,
+        default="recon_mcc",
+        choices=list(LOSS_REGISTRY.keys()),
+        required=False,
+    )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument(
         "--n_patience", type=int, default=10, help="Number of patience epochs"
@@ -91,27 +103,34 @@ def get_config() -> argparse.ArgumentParser:
     return parser.parse_args()
 
 
-def get_transforms(input_size):
-    train_transform = A.Compose(
-        [
-            A.Resize(input_size, input_size),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            CopyTransform(p=1),
-            ToTensorV2(),
-        ]
-    )
-    test_transform = A.Compose(
-        [
-            A.Resize(input_size, input_size),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            ToTensorV2(),
-        ]
-    )
+def get_transforms(
+    input_size, randstainna_transform=None, stain_separation_transform=None
+):
+    train_transform = [
+        A.Resize(input_size, input_size),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        CopyTransform(p=1),
+        ToTensorV2(),
+    ]
+    if randstainna_transform and stain_separation_transform:
+        train_transform.insert(
+            -3, A.OneOf([randstainna_transform, stain_separation_transform])
+        )
+    elif randstainna_transform is not None:
+        train_transform.insert(-3, randstainna_transform)
+    elif stain_separation_transform is not None:
+        train_transform.insert(-3, stain_separation_transform)
 
-    return train_transform, test_transform
+    test_transform = [
+        A.Resize(input_size, input_size),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ]
+
+    return A.Compose(train_transform), A.Compose(test_transform)
 
 
 if __name__ == "__main__":
@@ -161,6 +180,13 @@ if __name__ == "__main__":
                 val_images = [normalizer.transform(image) for image in val_images]
                 test_images = [normalizer.transform(image) for image in test_images]
 
+            # Append COSAS Task1 data
+            train_images += cosas_data1.images if args.use_task1 else list()
+            train_masks += cosas_data1.masks if args.use_task1 else list()
+
+            # Train dataset
+            dataset = DATASET_REGISTRY[args.dataset]
+            train_transform, test_transform = get_transforms(args.input_size)
             if args.sa == "albu_randstainna":
                 randstainna_transform = RandStainNATransform()
                 randstainna_transform.fit(train_images)
@@ -191,13 +217,6 @@ if __name__ == "__main__":
                 aug_fn = AUG_REGISTRY[args.sa]
                 train_images, train_masks = aug_fn(train_images, train_masks)
 
-            # Append COSAS Task1 data
-            train_images += cosas_data1.images if args.use_task1 else list()
-            train_masks += cosas_data1.masks if args.use_task1 else list()
-
-            # Train dataset
-            dataset = DATASET_REGISTRY[args.dataset]
-            train_transform, test_transform = get_transforms(args.input_size)
             train_dataset = dataset(
                 train_images, train_masks, train_transform, device=args.device
             )
@@ -231,9 +250,11 @@ if __name__ == "__main__":
             model = model.to(args.device)
             dp_model = torch.nn.DataParallel(model)
 
+            # Loss
+            loss = LOSS_REGISTRY[args.loss](alpha=args.alpha)
             trainer = AETrainer(
                 model=dp_model,
-                loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
+                loss=loss,
                 optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
                 device=args.device,
             )
