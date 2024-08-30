@@ -118,7 +118,7 @@ if __name__ == "__main__":
     args = get_config()
     set_seed(42)
 
-    cosas_data2 = COSASData(DATA_DIR, task=1)
+    cosas_data2 = COSASData(DATA_DIR, task=2)
     cosas_data2.load()
 
     if args.use_task1:
@@ -193,14 +193,14 @@ if __name__ == "__main__":
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
             # MODEL
-            if args.model_name:
-                model = MODEL_REGISTRY[args.model_name]()
-            else:
+            if args.model_name == "autoencoder":
                 model = MultiTaskAE(
                     architecture=args.architecture,
                     encoder_name=args.encoder_name,
                     input_size=(args.input_size, args.input_size),
                 )
+            else:
+                model = MODEL_REGISTRY[args.model_name]()
 
             model = model.to(args.device)
             dp_model = torch.nn.DataParallel(model)
