@@ -248,38 +248,38 @@ class CopyTransform(A.DualTransform):
         return ()
 
 
-def get_transforms(input_size):
-    train_transform = A.Compose(
-        [
-            A.Resize(input_size, input_size),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
-            A.OneOf(
-                [
-                    A.ColorJitter(
-                        brightness=(0.9, 1.1),
-                        contrast=(0.9, 1.0),
-                        hue=(-0.07, 0.07),
-                        saturation=(0.9, 1.1),
-                    ),
-                    # A.ToGray(),
-                ]
-            ),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            CopyTransform(p=1),
-            ToTensorV2(),
-        ]
-    )
-    test_transform = A.Compose(
-        [
-            A.Resize(input_size, input_size),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            ToTensorV2(),
-        ]
-    )
+def get_transforms(input_size, randstainna_transform=None):
+    train_transform = [
+        A.Resize(input_size, input_size),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.OneOf(
+            [
+                A.ColorJitter(
+                    brightness=(0.9, 1.1),
+                    contrast=(0.9, 1.0),
+                    hue=(-0.07, 0.07),
+                    saturation=(0.9, 1.1),
+                ),
+                A.ToGray(),
+            ]
+        ),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        CopyTransform(p=1),
+        ToTensorV2(),
+    ]
 
-    return train_transform, test_transform
+    if randstainna_transform is not None:
+        train_transform.insert(-3, randstainna_transform)
+
+    test_transform = [
+        A.Resize(input_size, input_size),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ]
+
+    return A.Compose(train_transform), A.Compose(test_transform)
 
 
 class GridElasticTransform(A.DualTransform):
@@ -418,6 +418,53 @@ class GridElasticTransform(A.DualTransform):
 
     def get_transform_init_args_names(self):
         return ("n_grid_width", "n_grid_height", "magnitude")
+
+
+class RandStainNATransform(A.ImageOnlyTransform):
+    """[summary] Applying Albumentation Randstainna augmentation to the image"""
+
+    def __init__(self, always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+
+    def fit(self, train_images, **params):
+        """[summary] fitting the training images to set up randstainna's config"""
+        color_params = get_randstainna_params(train_images)
+        randstainna_config = RANDSTAINNA_TEMPLATE.copy()
+        randstainna_config.update(color_params)
+
+        self.randstainna = ConfigRandStainNA(randstainna_config)
+        return
+
+    def apply(self, img, **params):
+        return cv2.cvtColor(self.randstainna(img), code=cv2.COLOR_BGR2RGB)
+
+
+# Deprecated) 위의 RandStainNATransform 클래스로 대체
+# def augmentation_randstainna(
+#     train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
+# ) -> List[np.ndarray]:
+#     from .transforms import (
+#         ConfigRandStainNA,
+#         get_randstainna_params,
+#         RANDSTAINNA_TEMPLATE,
+#     )
+
+#     color_params = get_randstainna_params(train_images)
+#     config = RANDSTAINNA_TEMPLATE.copy()
+#     config.update(color_params)
+#     ranstainna = ConfigRandStainNA(config)
+
+#     new_images = list()
+#     new_masks = list()
+#     for _ in range(multiple):
+#         for image, mask in zip(train_images, train_masks):
+#             new_images.append(cv2.cvtColor(ranstainna(image), code=cv2.COLOR_BGR2RGB))
+#             new_masks.append(mask)
+
+#     new_images.extend(train_images)
+#     new_masks.extend(train_masks)
+
+#     return new_images, new_masks
 
 
 def get_randstainna_params(images: List[np.ndarray]) -> dict:
@@ -666,6 +713,7 @@ def discard_minor_prediction(pred_mask: np.ndarray, ratio=0.05):
 
 
 AUG_REGISTRY = {
+    "albu_randstainna": "RandStainNATransform",
     "randstainna": augmentation_randstainna,
     "stain_sep": augmentation_stain_seperation,
     "mix": aug_mix,
