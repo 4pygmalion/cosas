@@ -540,18 +540,18 @@ class MultiTaskBinaryClassifierTrainer(BinaryClassifierTrainer):
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
         i = 0
-        for step, batch in enumerate(dataloader):
-            xs, ys = batch
+        for step, (xs, ys, ys_density) in enumerate(dataloader):
             xs = xs.to(self.device)
             ys = ys.to(self.device)
+            ys_density = ys_density.to(self.device)
 
             if phase == "train":
                 outputs = self.model(xs)
                 logits = outputs["mask"]
-                vector = outputs["vector"]
+                density = outputs["density"]
 
                 logits = logits.view(ys.shape)
-                loss = self.loss(logits, ys.float(), vector, density)
+                loss = self.loss(logits, ys.float(), density, ys_density)
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -561,9 +561,9 @@ class MultiTaskBinaryClassifierTrainer(BinaryClassifierTrainer):
                 with torch.no_grad():
                     outputs = self.model(xs)
                     logits = outputs["mask"]
-                    vector = outputs["vector"]
+                    density = outputs["density"]
                     logits = logits.view(ys.shape)
-                    loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
+                    loss = self.loss(logits, ys.float(), density, ys_density)
 
             # metric
             loss_meter.update(loss.item(), len(ys))

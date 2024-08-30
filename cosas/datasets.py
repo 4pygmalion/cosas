@@ -294,16 +294,14 @@ class StainDataset(Dataset):
             image, mask = augmented["image"], augmented["mask"]
 
             image: torch.Tensor = image
-            if idx not in self.image2density:
-                image_array = image.permute(1, 2, 0).cpu().numpy()
-                original_image = (de_normalization(image_array) * 255).astype(np.uint8)
-                stain_matrix = self.augmentor.get_stain_matrix(original_image)
-                stain_desnity = self.augmentor.get_stain_density(
-                    original_image, stain_matrix
-                )
-                self.image2density[idx] = stain_desnity
-            else:
-                stain_desnity = self.image2density[idx]
+            image_size = image.shape[-2:]
+            image_array = image.permute(1, 2, 0).cpu().numpy()  # float32
+            original_image = (de_normalization(image_array) * 255).astype(np.uint8)
+            stain_matrix = self.augmentor.get_stain_matrix(original_image)
+            stain_desnity = self.augmentor.get_stain_density(
+                original_image, stain_matrix
+            ).T
+            stain_desnity = torch.tensor(stain_desnity).reshape(2, *image_size).float()
 
             # stride가 negative인 경우 처리
             if isinstance(mask, torch.Tensor):
@@ -321,4 +319,5 @@ DATASET_REGISTRY = {
     "image_mask": ImageMaskDataset,
     "multiscale": MultiScaleDataset,
     "supercon": SupConDataset,
+    "stain": StainDataset,
 }
