@@ -849,7 +849,7 @@ class Siamformer(torch.nn.Module):
         )
 
 
-class MultiTaskSegformer(torch.nn.Module):
+class StainReconSegformer(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -926,6 +926,51 @@ class MultiTaskSegformer(torch.nn.Module):
         }
 
 
+class StainPredictSegformer(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        model = SegformerForSemanticSegmentation.from_pretrained(
+            "nvidia/mit-b5", ignore_mismatched_sizes=True
+        )
+        self.encoder = model.segformer.encoder
+        self.mask_head = deepcopy(model.decode_head)
+        self.mask_head.classifier = torch.nn.Conv2d(
+            768,
+            1,
+            kernel_size=1,
+            stride=1,
+        )
+
+        self.stain_head = deepcopy(model.decode_head)
+        self.stain_head.classifier = torch.nn.Sequential(
+            torch.nn.Conv2d(
+                768,
+                2,
+                kernel_size=1,
+                stride=1,
+            ),
+            torch.nn.ReLU(),
+        )
+
+    def forward(self, x):
+        w, h = x.shape[-2:]
+        z = self.encoder(
+            x,
+            output_hidden_states=True,
+        ).hidden_states
+
+        mask = self.mask_head(z)
+        stain = self.stain_head(z)
+
+        return {
+            "density": torch.nn.functional.interpolate(
+                stain, size=(w, h), mode="bilinear"
+            ),
+            "mask": torch.nn.functional.interpolate(mask, size=(w, h), mode="bilinear"),
+        }
+
+
 MODEL_REGISTRY = {
     "pyramid": PyramidSeg,
     "transunet": TransUNet,
@@ -933,5 +978,5 @@ MODEL_REGISTRY = {
     "segformer": Segformer,
     "transpose_unet": TransposeUnet,
     "siamformer": Siamformer,
-    "multitask_segformer": MultiTaskSegformer,
+    "stain_recon_segformer": StainReconSegformer,
 }

@@ -24,7 +24,7 @@ def de_normalization(
 
     Args:
         normalized_image (np.ndarray): 정규화된 이미지.
-            이 배열은 (H, W, C) 형태로,  H는 높이, W는 너비, C는 채널 수
+            이 배열은 (H, W, C) 형태로,  H는 높이, W는 너비, C는 채널 수 (np.float32)
         mean (list, optional): 정규화 시 사용된 평균값. 각 채널에 대한 평균값을 나타내며,
             기본값은 [0.485, 0.456, 0.406]입니다.
         sd (list, optional): 정규화 시 사용된 표준편차. 각 채널에 대한 표준편차를 나타내며,
@@ -263,7 +263,7 @@ def get_transforms(input_size):
                         hue=(-0.07, 0.07),
                         saturation=(0.9, 1.1),
                     ),
-                    A.ToGray(),
+                    # A.ToGray(),
                 ]
             ),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
