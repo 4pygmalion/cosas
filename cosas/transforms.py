@@ -426,13 +426,13 @@ class RandStainNATransform(A.ImageOnlyTransform):
     def __init__(self, always_apply=False, p=0.5):
         super().__init__(always_apply=always_apply, p=p)
 
-        randstainna_config = RANDSTAINNA_TEMPLATE.copy()
-        self.randstainna = ConfigRandStainNA(randstainna_config)
-
     def fit(self, train_images, **params):
         """[summary] fitting the training images to set up randstainna's config"""
         color_params = get_randstainna_params(train_images)
-        self.randstainna.config.update(color_params)
+        randstainna_config = RANDSTAINNA_TEMPLATE.copy()
+        randstainna_config.update(color_params)
+
+        self.randstainna = ConfigRandStainNA(randstainna_config)
         return
 
     def apply(self, img, **params):
@@ -713,6 +713,7 @@ def discard_minor_prediction(pred_mask: np.ndarray, ratio=0.05):
 
 
 AUG_REGISTRY = {
+    "albu_randstainna": "RandStainNATransform",
     "randstainna": augmentation_randstainna,
     "stain_sep": augmentation_stain_seperation,
     "mix": aug_mix,

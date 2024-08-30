@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
             train_transform, test_transform = get_transforms(args.input_size)
             # Augmentation settings
-            if args.sa == "augmentation_randstainna":
+            if args.sa == "albu_randstainna":
                 randstainna_transform = RandStainNATransform()
                 randstainna_transform.fit(train_images)
 
