@@ -244,7 +244,9 @@ def rotational_tta(xs, model, angles=[0, 90, 180, 270]):
         outputs = []
         for angle in angles:
             x_new = rotate(x, angle=angle)
-            outputs.append(model(x_new.unsqueeze(0)))
+            output = model(x_new.unsqueeze(0))
+            output = rotate(output.squeeze(0), -angle)
+            outputs.append(output)
 
         y_hat = torch.concat(outputs).mean(dim=0)
         y_hats.append(y_hat)
