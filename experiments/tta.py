@@ -9,7 +9,7 @@ from PIL import Image
 from progress.bar import Bar
 from torchvision.transforms import ToPILImage
 from torch.utils.data import DataLoader
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from albumentations.pytorch.transforms import ToTensorV2
 
 from cosas.metrics import AverageMeter, Metrics, calculate_metrics
@@ -28,6 +28,8 @@ from cosas.metrics import summarize_metrics
 from cosas.misc import rotational_tta, rotational_tta_dict
 from cosas.normalization import SPCNNormalizer
 from cosas.transforms import POSTPROCESS_REGISTRY
+import os
+import os
 
 
 MODEL_URI = "file:///vast/AI_team/mlflow_artifact/13/{run_id}/artifacts/model"
@@ -216,6 +218,7 @@ def prepare_test_dataloader(test_images, test_masks, input_size, batch_size, dev
 
 
 def process_fold(
+    val_dataloader,
     test_dataloader,
     fold,
     evaluator: Evaluator,
@@ -229,6 +232,17 @@ def process_fold(
         nested=True,
         experiment_id=MLFLOW_EXP.experiment_id,
     ):
+
+        val_loss, val_metrics = evaluator.run_epoch(
+            val_dataloader,
+            threshold=0.5,
+            tta=tta_fn,
+            postprocess=postprocess,
+            save_plot=True,
+            model_return_dict=model_return_dict,
+        )
+        mlflow.log_metric("val_loss", val_loss.avg)
+        mlflow.log_metrics(val_metrics.to_dict(prefix="val_"))
 
         test_loss, test_metrics = evaluator.run_epoch(
             test_dataloader,
@@ -268,11 +282,29 @@ def main():
             child_run = mlflow.get_run(child_run_id)
             params = child_run.data.params
 
+            train_val_images = [cosas_data.images[i] for i in train_val_indices]
+            train_val_masks = [cosas_data.masks[i] for i in train_val_indices]
+            train_val_domains = cosas_data.domain_indices[train_val_indices]
             test_images = [cosas_data.images[i] for i in test_indices]
             test_masks = [cosas_data.masks[i] for i in test_indices]
+            train_images, val_images, train_masks, val_masks = train_test_split(
+                train_val_images,
+                train_val_masks,
+                test_size=0.2,
+                random_state=args.seed,
+                stratify=train_val_domains,
+            )
 
             if args.use_sn:
+                val_images = stain_normalization(val_images)
                 test_images = stain_normalization(test_images)
+            val_dataloader = prepare_test_dataloader(
+                val_images,
+                val_masks,
+                int(params["input_size"]),
+                args.batch_size,
+                args.device,
+            )
             test_dataloader = prepare_test_dataloader(
                 test_images,
                 test_masks,
@@ -298,6 +330,7 @@ def main():
                 postprocess = POSTPROCESS_REGISTRY[args.postprocess]
 
             metrics = process_fold(
+                val_dataloader,
                 test_dataloader,
                 fold,
                 evaluator,
