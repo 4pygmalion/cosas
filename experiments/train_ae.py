@@ -55,7 +55,7 @@ def get_config() -> argparse.ArgumentParser:
         "--model_name",
         type=str,
         help="Model name",
-        default="autoencoder",
+        required=False,
         choices=list(MODEL_REGISTRY.keys()),
     )
     arch_choices = [
