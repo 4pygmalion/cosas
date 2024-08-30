@@ -539,7 +539,7 @@ class MultiTaskBinaryClassifierTrainer(BinaryClassifierTrainer):
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-        i = 0
+
         for step, (xs, ys, ys_density) in enumerate(dataloader):
             xs = xs.to(self.device)
             ys = ys.to(self.device)
