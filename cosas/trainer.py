@@ -12,7 +12,7 @@ from torchvision.transforms import ToPILImage
 from progress.bar import Bar
 from sklearn.metrics import roc_auc_score
 
-from .tracking import plot_and_save, log_patch_and_save
+from .tracking import log_patch_and_save_by_batch
 from .metrics import Metrics, AverageMeter, calculate_metrics
 
 
@@ -118,7 +118,7 @@ class BinaryClassifierTrainer(ABC):
         if phase == "train":
             self.model.train()
         else:
-            self.model.eval
+            self.model.eval()
 
         total_step = len(dataloader)
         bar = Bar(max=total_step, check_tty=False)
@@ -163,21 +163,7 @@ class BinaryClassifierTrainer(ABC):
             )
 
             if save_plot:
-                for x, y, patch_confidence in zip(xs, ys, confidences):
-                    mean = [0.485, 0.456, 0.406]
-                    sd = [0.229, 0.224, 0.225]
-                    original_x = ToPILImage()(
-                        x.detach().cpu() * torch.tensor(sd)[:, None, None]
-                        + torch.tensor(mean)[:, None, None]
-                    )
-                    log_patch_and_save(
-                        image_name=f"step_{i}",
-                        original_x=np.array(original_x),
-                        original_y=y.detach().cpu().numpy(),
-                        pred_masks=patch_confidence.detach().cpu().numpy() >= 0.5,
-                        artifact_dir=f"{phase}_prediction",
-                    )
-                    i += 1
+                log_patch_and_save_by_batch(xs, ys, confidences, phase=phase)
 
             bar.suffix = self.make_bar_sentence(
                 phase=phase,
@@ -432,7 +418,7 @@ class AETrainer(BinaryClassifierTrainer):
         if phase == "train":
             self.model.train()
         else:
-            self.model.eval
+            self.model.eval()
 
         total_step = len(dataloader)
         bar = Bar(max=total_step, check_tty=False)
@@ -485,33 +471,117 @@ class AETrainer(BinaryClassifierTrainer):
             )
 
             if save_plot:
-                for i, (x, y, confidences) in enumerate(
-                    zip(xs, ys, images_confidences)
-                ):
-                    image_confidences = confidences.detach().cpu().numpy()
-                    image_lebels = y.detach().cpu().numpy()
-                    instance_metrics = calculate_metrics(
-                        image_confidences.ravel(),
-                        image_lebels.ravel(),
-                        threshold=threshold,
-                    )
-                    dice = round(instance_metrics["dice"], 4)
-                    iou = round(instance_metrics["iou"], 4)
+                log_patch_and_save_by_batch(xs, ys, images_confidences, phase=phase)
 
-                    mean = [0.485, 0.456, 0.406]
-                    sd = [0.229, 0.224, 0.225]
-                    original_x = ToPILImage()(
-                        x.detach().cpu() * torch.tensor(sd)[:, None, None]
-                        + torch.tensor(mean)[:, None, None]
-                    )
-                    log_patch_and_save(
-                        image_name=f"step_{i}_dice_{dice}_iou_{iou}",
-                        original_x=np.array(original_x),
-                        original_y=image_lebels,
-                        pred_masks=image_confidences >= 0.5,
-                        artifact_dir=f"{phase}_prediction",
-                    )
-                    i += 1
+            bar.suffix = self.make_bar_sentence(
+                phase=phase,
+                epoch=epoch,
+                step=step,
+                total_step=total_step,
+                eta=bar.eta,
+                total_loss=loss_meter.avg,
+                metrics=epoch_metrics,
+            )
+            bar.next()
+
+        bar.finish()
+
+        return (loss_meter, epoch_metrics)
+
+
+class MultiTaskBinaryClassifierTrainer(BinaryClassifierTrainer):
+    def __init__(
+        self,
+        model: torch.nn.modules.Module,
+        loss: torch.nn.modules.loss._Loss,
+        device: str = "cuda",
+        optimizer: torch.optim.Optimizer = None,
+        logger: logging.Logger = None,
+    ):
+        self.model = model
+        self.loss = loss
+        self.optimizer = optimizer
+        self.device = device
+        self.logger = logging.Logger("AutoEncoderTrainer") if logger is None else logger
+
+    def run_epoch(
+        self,
+        dataloader: torch.utils.data.DataLoader,
+        epoch: int,
+        phase: Literal["train", "val", "test"],
+        threshold: float = 0.5,
+        save_plot: bool = False,
+    ) -> Tuple[AverageMeter, Metrics]:
+        """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
+        반환함.
+
+        Note:
+            - 1 epoch = Dataset의 전체를 학습한경우
+            - 1 step = epoch을 하기위해 더 작은 단위(batch)로 학습할 떄의 단위
+
+        Args:
+            phase (str): training or validation
+            epoch (int): epoch
+            dataloader (torch.utils.data.DataLoader): dataset (train or validation)
+
+        Returns:
+            Tuple: loss, accuracy, top_k_recall
+        """
+
+        # init
+        if phase == "train":
+            self.model.train()
+        else:
+            self.model.eval
+
+        total_step = len(dataloader)
+        bar = Bar(max=total_step, check_tty=False)
+
+        epoch_metrics = Metrics()
+        loss_meter = AverageMeter("loss")
+
+        for step, (xs, ys, ys_density) in enumerate(dataloader):
+            xs = xs.to(self.device)
+            ys = ys.to(self.device)
+            ys_density = ys_density.to(self.device)
+
+            if phase == "train":
+                outputs = self.model(xs)
+                logits = outputs["mask"]
+                density = outputs["density"]
+
+                logits = logits.view(ys.shape)
+                loss = self.loss(logits, ys.float(), density, ys_density)
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+            else:
+                with torch.no_grad():
+                    outputs = self.model(xs)
+                    logits = outputs["mask"]
+                    density = outputs["density"]
+                    logits = logits.view(ys.shape)
+                    loss = self.loss(logits, ys.float(), density, ys_density)
+
+            # metric
+            loss_meter.update(loss.item(), len(ys))
+
+            images_confidences = torch.sigmoid(logits)
+            flat_confidence = images_confidences.flatten().detach().cpu().numpy()
+            ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
+
+            epoch_metrics.update(
+                calculate_metrics(
+                    flat_confidence,
+                    ground_truths,
+                    threshold=threshold,
+                )
+            )
+
+            if save_plot:
+                log_patch_and_save_by_batch(xs, ys, images_confidences, phase=phase)
 
             bar.suffix = self.make_bar_sentence(
                 phase=phase,

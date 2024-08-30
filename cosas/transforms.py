@@ -8,9 +8,47 @@ import torch
 import albumentations as A
 from PIL import Image
 from torchvision.transforms.functional import pad
+from torchvision.transforms.functional import to_pil_image
 from albumentations.pytorch.transforms import ToTensorV2
 from histomicstk.preprocessing.color_conversion import rgb_to_lab
+
 from .randstainna.randstainna import RandStainNA, Dict2Class
+from .stain_seperation.seestaina.structure_preversing import Augmentor
+
+
+def de_normalization(
+    normalized_image: np.ndarray,
+    mean=[0.485, 0.456, 0.406],
+    sd=[0.229, 0.224, 0.225],
+) -> np.ndarray:
+    """정규화된 이미지를 복원함
+
+    Args:
+        normalized_image (np.ndarray): 정규화된 이미지.
+            이 배열은 (H, W, C) 형태로,  H는 높이, W는 너비, C는 채널 수 (np.float32)
+        mean (list, optional): 정규화 시 사용된 평균값. 각 채널에 대한 평균값을 나타내며,
+            기본값은 [0.485, 0.456, 0.406]입니다.
+        sd (list, optional): 정규화 시 사용된 표준편차. 각 채널에 대한 표준편차를 나타내며,
+            기본값은 [0.229, 0.224, 0.225]입니다.
+
+    Returns:
+        np.ndarray: 정규화가 해제된 원본 이미지.
+            이 배열은 (H, W, C) 형태로 반환. np.float32
+
+    Example:
+        >>> _, test_transform = get_transforms(512)
+        >>> aug = test_transform(image=cosas_data.images[0])
+        >>> img = aug["image"].permute(1, 2, 0).numpy()
+        >>> original_x = de_normalization(img)
+        >>> plt.imshow(original_x, vmin=0, vmax=1)
+
+    """
+    broadcast_sd = np.array(sd)[np.newaxis, np.newaxis, :]
+    broadcast_mean = np.array(mean)[np.newaxis, np.newaxis, :]
+
+    original_x = (normalized_image * broadcast_sd) + broadcast_mean
+
+    return original_x
 
 
 def get_image_stats(
@@ -211,38 +249,46 @@ class CopyTransform(A.DualTransform):
         return ()
 
 
-def get_transforms(input_size):
-    train_transform = A.Compose(
-        [
-            A.Resize(input_size, input_size),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
-            A.OneOf(
-                [
-                    A.ColorJitter(
-                        brightness=(0.9, 1.1),
-                        contrast=(0.9, 1.0),
-                        hue=(-0.07, 0.07),
-                        saturation=(0.9, 1.1),
-                    ),
-                    A.ToGray(),
-                ]
-            ),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            CopyTransform(p=1),
-            ToTensorV2(),
-        ]
-    )
-    test_transform = A.Compose(
-        [
-            A.Resize(input_size, input_size),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-            ToTensorV2(),
-        ]
-    )
+def get_transforms(
+    input_size, randstainna_transform=None, stain_separation_transform=None
+):
+    train_transform = [
+        A.Resize(input_size, input_size),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.OneOf(
+            [
+                A.ColorJitter(
+                    brightness=(0.9, 1.1),
+                    contrast=(0.9, 1.0),
+                    hue=(-0.07, 0.07),
+                    saturation=(0.9, 1.1),
+                ),
+                A.ToGray(),
+            ]
+        ),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        CopyTransform(p=1),
+        ToTensorV2(),
+    ]
 
-    return train_transform, test_transform
+    if randstainna_transform and stain_separation_transform:
+        train_transform.insert(
+            -3, A.OneOf([randstainna_transform, stain_separation_transform])
+        )
+    elif randstainna_transform is not None:
+        train_transform.insert(-3, randstainna_transform)
+    elif stain_separation_transform is not None:
+        train_transform.insert(-3, stain_separation_transform)
+
+    test_transform = [
+        A.Resize(input_size, input_size),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ]
+
+    return A.Compose(train_transform), A.Compose(test_transform)
 
 
 class GridElasticTransform(A.DualTransform):
@@ -381,6 +427,25 @@ class GridElasticTransform(A.DualTransform):
 
     def get_transform_init_args_names(self):
         return ("n_grid_width", "n_grid_height", "magnitude")
+
+
+class RandStainNATransform(A.ImageOnlyTransform):
+    """[summary] Applying Albumentation Randstainna augmentation to the image"""
+
+    def __init__(self, always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+
+    def fit(self, train_images, **params):
+        """[summary] fitting the training images to set up randstainna's config"""
+        color_params = get_randstainna_params(train_images)
+        randstainna_config = RANDSTAINNA_TEMPLATE.copy()
+        randstainna_config.update(color_params)
+
+        self.randstainna = ConfigRandStainNA(randstainna_config)
+        return
+
+    def apply(self, img, **params):
+        return cv2.cvtColor(self.randstainna(img), code=cv2.COLOR_BGR2RGB)
 
 
 def get_randstainna_params(images: List[np.ndarray]) -> dict:
@@ -540,6 +605,26 @@ def augmentation_randstainna(
     return new_images, new_masks
 
 
+class StainSeparationTransform(A.ImageOnlyTransform):
+    """[summary] Applying Albumentation Stain Separation augmentation to the image"""
+
+    def __init__(self, always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+        self.augmentor = Augmentor()
+
+    def apply(self, img, **params):
+
+        return np.array(
+            self.augmentor.image_augmentation_with_stain_vector(
+                img,
+                aug_saturation=True,
+                aug_density=True,
+                aug_value=True,
+                p=1,
+            )
+        )
+
+
 def augmentation_stain_seperation(
     train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
 ) -> List[np.ndarray]:
@@ -629,6 +714,9 @@ def discard_minor_prediction(pred_mask: np.ndarray, ratio=0.05):
 
 
 AUG_REGISTRY = {
+    "albu_randstainna": "RandStainNATransform",
+    "albu_stain_separation": "StainSeparationTransform",
+    "albu_mix": "albu_mix",
     "randstainna": augmentation_randstainna,
     "stain_sep": augmentation_stain_seperation,
     "mix": aug_mix,

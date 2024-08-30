@@ -11,6 +11,8 @@ from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import (
+    RandStainNATransform,
+    StainSeparationTransform,
     get_transforms,
     find_representative_lab_image,
     get_lab_distribution,
@@ -82,11 +84,39 @@ if __name__ == "__main__":
                 train_images, val_images, test_images = stain_normalization(
                     train_images, val_images, test_images
                 )
-            if args.sa:
+
+            train_transform, test_transform = get_transforms(args.input_size)
+            # Augmentation settings
+            if args.sa == "albu_randstainna":
+                randstainna_transform = RandStainNATransform()
+                randstainna_transform.fit(train_images)
+
+                train_transform, test_transform = get_transforms(
+                    args.input_size,
+                    randstainna_transform=randstainna_transform,
+                    stain_separation_transform=None,
+                )
+            elif args.sa == "albu_stain_separation":
+                stain_separation_transform = StainSeparationTransform()
+                train_transform, test_transform = get_transforms(
+                    args.input_size,
+                    randstainna_transform=None,
+                    stain_separation_transform=stain_separation_transform,
+                )
+            elif args.sa == "albu_mix":
+                randstainna_transform = RandStainNATransform()
+                randstainna_transform.fit(train_images)
+
+                stain_separation_transform = StainSeparationTransform()
+                train_transform, test_transform = get_transforms(
+                    args.input_size,
+                    randstainna_transform=randstainna_transform,
+                    stain_separation_transform=stain_separation_transform,
+                )
+            elif args.sa:
                 aug_fn = AUG_REGISTRY[args.sa]
                 train_images, train_masks = aug_fn(train_images, train_masks)
 
-            train_transform, test_transform = get_transforms(args.input_size)
             dataset = DATASET_REGISTRY[args.dataset]
             train_dataset = dataset(
                 train_images, train_masks, train_transform, device=args.device

@@ -7,9 +7,9 @@ import torch
 import numpy as np
 import albumentations as A
 from torch.utils.data import Dataset
-from torchvision.transforms import ToPILImage, ToTensor
 
-from cosas.transforms import tesellation, pad_image_tensor
+from .transforms import tesellation, de_normalization
+from .stain_seperation.seestaina.structure_preversing import Augmentor
 
 
 class Patchdataset(Dataset):
@@ -270,10 +270,54 @@ class SupConDataset(Dataset):
         return views, torch.tensor([label], dtype=torch.float32)
 
 
+class StainDataset(Dataset):
+    def __init__(
+        self, images, masks, transform: A.Compose | None = None, device="cuda"
+    ):
+        self.images = images
+        self.masks = masks
+        self.transform = transform
+        self.device = device
+        self.augmentor = Augmentor()
+        self.image2density = dict()
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        image = self.images[idx]
+        mask = self.masks[idx]
+
+        # self.transform: np.ndarray -> Dict[str, Tensor]
+        if self.transform:
+            augmented = self.transform(image=image, mask=mask)
+            image, mask = augmented["image"], augmented["mask"]
+
+            image: torch.Tensor = image
+            image_size = image.shape[-2:]
+            image_array = image.permute(1, 2, 0).cpu().numpy()  # float32
+            original_image = (de_normalization(image_array) * 255).astype(np.uint8)
+            stain_matrix = self.augmentor.get_stain_matrix(original_image)
+            stain_desnity = self.augmentor.get_stain_density(
+                original_image, stain_matrix
+            ).T
+            stain_desnity = torch.tensor(stain_desnity).reshape(2, *image_size).float()
+
+            # stride가 negative인 경우 처리
+            if isinstance(mask, torch.Tensor):
+                mask = torch.from_numpy(mask.numpy().copy())
+            return image, mask, stain_desnity
+
+        else:
+            image = torch.from_numpy(image.copy())
+            mask = torch.from_numpy(mask.copy())
+
+
 DATASET_REGISTRY = {
     "patch": Patchdataset,
     "whole": WholeSizeDataset,
     "image_mask": ImageMaskDataset,
     "multiscale": MultiScaleDataset,
     "supercon": SupConDataset,
+    "stain": StainDataset,
 }

@@ -270,6 +270,18 @@ class ReconIoULoss(torch.nn.Module):
             loss += sparisty_penalty
             return loss
 
+
+class StainLoss(torch.nn.Module):
+    def __init__(self, alpha: float = 1):
+        super(StainLoss, self).__init__()
+        self.alpha = alpha
+        self.iou = IoULoss()
+
+    def forward(self, logits, targets, pred_density, target_desnity):
+        mask_error = self.iou(logits, targets)
+        stain_error = torch.nn.functional.mse_loss(pred_density, target_desnity)
+        loss = mask_error + self.alpha * stain_error
+
         return loss
 
 
@@ -282,4 +294,5 @@ LOSS_REGISTRY = {
     "diceiou": DiceIoU,
     "recon_mcc": ReconMCCLoss,
     "recon_iou": ReconIoULoss,
+    "stain-loss": StainLoss,
 }
