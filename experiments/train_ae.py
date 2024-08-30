@@ -161,7 +161,33 @@ if __name__ == "__main__":
                 val_images = [normalizer.transform(image) for image in val_images]
                 test_images = [normalizer.transform(image) for image in test_images]
 
-            if args.sa:
+            if args.sa == "albu_randstainna":
+                randstainna_transform = RandStainNATransform()
+                randstainna_transform.fit(train_images)
+
+                train_transform, test_transform = get_transforms(
+                    args.input_size,
+                    randstainna_transform=randstainna_transform,
+                    stain_separation_transform=None,
+                )
+            elif args.sa == "albu_stain_separation":
+                stain_separation_transform = StainSeparationTransform()
+                train_transform, test_transform = get_transforms(
+                    args.input_size,
+                    randstainna_transform=None,
+                    stain_separation_transform=stain_separation_transform,
+                )
+            elif args.sa == "albu_mix":
+                randstainna_transform = RandStainNATransform()
+                randstainna_transform.fit(train_images)
+
+                stain_separation_transform = StainSeparationTransform()
+                train_transform, test_transform = get_transforms(
+                    args.input_size,
+                    randstainna_transform=randstainna_transform,
+                    stain_separation_transform=stain_separation_transform,
+                )
+            elif args.sa:
                 aug_fn = AUG_REGISTRY[args.sa]
                 train_images, train_masks = aug_fn(train_images, train_masks)
 
