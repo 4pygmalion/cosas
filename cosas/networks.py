@@ -978,5 +978,6 @@ MODEL_REGISTRY = {
     "segformer": Segformer,
     "transpose_unet": TransposeUnet,
     "siamformer": Siamformer,
+    "recon_segformer": StainReconSegformer,
     "stainsegformer": StainPredictSegformer,
 }
