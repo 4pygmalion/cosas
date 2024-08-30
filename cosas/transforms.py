@@ -13,6 +13,7 @@ from albumentations.pytorch.transforms import ToTensorV2
 from histomicstk.preprocessing.color_conversion import rgb_to_lab
 
 from .randstainna.randstainna import RandStainNA, Dict2Class
+from .stain_seperation.seestaina.structure_preversing import Augmentor
 
 
 def de_normalization(
@@ -248,7 +249,9 @@ class CopyTransform(A.DualTransform):
         return ()
 
 
-def get_transforms(input_size, randstainna_transform=None):
+def get_transforms(
+    input_size, randstainna_transform=None, stain_separation_transform=None
+):
     train_transform = [
         A.Resize(input_size, input_size),
         A.HorizontalFlip(p=0.5),
@@ -270,8 +273,14 @@ def get_transforms(input_size, randstainna_transform=None):
         ToTensorV2(),
     ]
 
-    if randstainna_transform is not None:
+    if randstainna_transform and stain_separation_transform:
+        train_transform.insert(
+            -3, A.OneOf([randstainna_transform, stain_separation_transform])
+        )
+    elif randstainna_transform is not None:
         train_transform.insert(-3, randstainna_transform)
+    elif stain_separation_transform is not None:
+        train_transform.insert(-3, stain_separation_transform)
 
     test_transform = [
         A.Resize(input_size, input_size),
@@ -439,34 +448,6 @@ class RandStainNATransform(A.ImageOnlyTransform):
         return cv2.cvtColor(self.randstainna(img), code=cv2.COLOR_BGR2RGB)
 
 
-# Deprecated) 위의 RandStainNATransform 클래스로 대체
-# def augmentation_randstainna(
-#     train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
-# ) -> List[np.ndarray]:
-#     from .transforms import (
-#         ConfigRandStainNA,
-#         get_randstainna_params,
-#         RANDSTAINNA_TEMPLATE,
-#     )
-
-#     color_params = get_randstainna_params(train_images)
-#     config = RANDSTAINNA_TEMPLATE.copy()
-#     config.update(color_params)
-#     ranstainna = ConfigRandStainNA(config)
-
-#     new_images = list()
-#     new_masks = list()
-#     for _ in range(multiple):
-#         for image, mask in zip(train_images, train_masks):
-#             new_images.append(cv2.cvtColor(ranstainna(image), code=cv2.COLOR_BGR2RGB))
-#             new_masks.append(mask)
-
-#     new_images.extend(train_images)
-#     new_masks.extend(train_masks)
-
-#     return new_images, new_masks
-
-
 def get_randstainna_params(images: List[np.ndarray]) -> dict:
     """
 
@@ -624,6 +605,26 @@ def augmentation_randstainna(
     return new_images, new_masks
 
 
+class StainSeparationTransform(A.ImageOnlyTransform):
+    """[summary] Applying Albumentation Stain Separation augmentation to the image"""
+
+    def __init__(self, always_apply=False, p=0.5):
+        super().__init__(always_apply=always_apply, p=p)
+        self.augmentor = Augmentor()
+
+    def apply(self, img, **params):
+
+        return np.array(
+            self.augmentor.image_augmentation_with_stain_vector(
+                img,
+                aug_saturation=True,
+                aug_density=True,
+                aug_value=True,
+                p=1,
+            )
+        )
+
+
 def augmentation_stain_seperation(
     train_images: List[np.ndarray], train_masks: List[np.ndarray], multiple: int = 2
 ) -> List[np.ndarray]:
@@ -714,6 +715,8 @@ def discard_minor_prediction(pred_mask: np.ndarray, ratio=0.05):
 
 AUG_REGISTRY = {
     "albu_randstainna": "RandStainNATransform",
+    "albu_stain_separation": "StainSeparationTransform",
+    "albu_mix": "albu_mix",
     "randstainna": augmentation_randstainna,
     "stain_sep": augmentation_stain_seperation,
     "mix": aug_mix,

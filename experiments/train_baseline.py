@@ -12,6 +12,7 @@ from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY
 from cosas.transforms import (
     RandStainNATransform,
+    StainSeparationTransform,
     get_transforms,
     find_representative_lab_image,
     get_lab_distribution,
@@ -91,7 +92,26 @@ if __name__ == "__main__":
                 randstainna_transform.fit(train_images)
 
                 train_transform, test_transform = get_transforms(
-                    args.input_size, randstainna_transform
+                    args.input_size,
+                    randstainna_transform=randstainna_transform,
+                    stain_separation_transform=None,
+                )
+            elif args.sa == "albu_stain_separation":
+                stainsep_transform = StainSeparationTransform()
+                train_transform, test_transform = get_transforms(
+                    args.input_size,
+                    randstainna_transform=None,
+                    stainsep_transform=stainsep_transform,
+                )
+            elif args.sa == "albu_mix":
+                randstainna_transform = RandStainNATransform()
+                randstainna_transform.fit(train_images)
+
+                stainsep_transform = StainSeparationTransform()
+                train_transform, test_transform = get_transforms(
+                    args.input_size,
+                    randstainna_transform=randstainna_transform,
+                    stainsep_transform=stainsep_transform,
                 )
             elif args.sa:
                 aug_fn = AUG_REGISTRY[args.sa]
