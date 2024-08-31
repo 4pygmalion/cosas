@@ -270,6 +270,8 @@ class ReconIoULoss(torch.nn.Module):
             loss += sparisty_penalty
             return loss
 
+        return loss
+
 
 class StainLoss(torch.nn.Module):
     def __init__(self, alpha: float = 1):
