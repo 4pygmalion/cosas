@@ -253,7 +253,7 @@ class ReconMCCLoss(torch.nn.Module):
 
 
 class ReconIoULoss(torch.nn.Module):
-    def __init__(self, use_sparisty_loss: bool, alpha: float = 1):
+    def __init__(self, use_sparisty_loss: bool = False, alpha: float = 1):
         super(ReconIoULoss, self).__init__()
         self.iou = IoULoss()
         self.sparsity_loss = SparsityLoss()
