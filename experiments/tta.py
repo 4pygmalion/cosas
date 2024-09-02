@@ -13,7 +13,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from albumentations.pytorch.transforms import ToTensorV2
 
 from cosas.metrics import AverageMeter, Metrics, calculate_metrics
-from cosas.losses import AELoss
+from cosas.losses import ReconMCCLoss
 from cosas.trainer import BinaryClassifierTrainer
 from cosas.data_model import COSASData
 from cosas.paths import DATA_DIR
@@ -291,7 +291,7 @@ def main():
             model_uri = MODEL_URI.format(run_id=child_run_id)
             model = mlflow.pytorch.load_model(model_uri).eval()
             evaluator = Evaluator(
-                model=model, loss=AELoss(False, alpha=1), device=args.device
+                model=model, loss=ReconMCCLoss(False, alpha=1), device=args.device
             )
 
             if not args.use_tta:
