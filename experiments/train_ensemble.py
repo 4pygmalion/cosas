@@ -56,7 +56,7 @@ def extended_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    args = get_config()
+    args = extended_args()
     set_seed(42)
 
     cosas_data = COSASData(DATA_DIR, task=args.task)
