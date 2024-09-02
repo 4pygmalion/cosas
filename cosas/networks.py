@@ -1069,9 +1069,9 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
             def __init__(self):
                 super(FusionModule, self).__init__()
                 self.layer = torch.nn.Sequential(
-                    torch.nn.Conv2d(2, 8, kernel_size=(1, 1), stride=(1,1)),
-                    torch.nn.ReLU(), 
-                    torch.nn.Conv2d(2, 1, kernel_size=(1, 1), stride=(1,1))
+                    torch.nn.Conv2d(2, 8, kernel_size=(1, 1), stride=(1, 1)),
+                    torch.nn.ReLU(),
+                    torch.nn.Conv2d(8, 1, kernel_size=(1, 1), stride=(1, 1)),
                 )
 
             def forward(self, x):
@@ -1079,11 +1079,11 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
 
         class MajorityVoting(torch.nn.Module):
             def forward(self, z):
-                return torch.mode(z, dim=1).values
+                return torch.mode(z, dim=1, keepdim=True).values
 
         class MaxConfidence(torch.nn.Module):
             def forward(self, z):
-                return torch.max(z, dim=1).values
+                return torch.max(z, dim=1, keepdim=True).values
 
         agg_layers = {
             "majority_voting": MajorityVoting,
@@ -1101,12 +1101,6 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
 
         return
 
-    def majority_voting(self, z):
-        return torch.mode(z, dim=1).values
-
-    def max_confidence(self, z):
-        return torch.max(z, dim=1).values
-
     def forward(self, x):
         """
         AE input_size = 640
@@ -1120,7 +1114,8 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
         )
         output2 = self.model2(x2)
 
-        z = torch.stack([output1, output2], dim=1)  # B, Feature, W, H
+        # B, 1, W, H + B, 1, W, H -> B, 2, W, H
+        z = torch.concat([output1, output2], dim=1)
 
         return self.agg_layer(z)
 
