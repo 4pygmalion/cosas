@@ -96,7 +96,7 @@ def extended_args() -> argparse.Namespace:
         choices=["majority_voting", "max_confidence", "meta"],
     )
 
-    return parser
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
