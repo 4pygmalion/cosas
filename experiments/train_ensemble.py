@@ -7,6 +7,7 @@ import torch
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
+from cosas.misc import SetSMPArgs
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
@@ -46,9 +47,46 @@ def stain_normalization(train_images, val_images, test_images):
 
 
 def extended_args() -> argparse.Namespace:
-    args = get_config()
-
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--run_name", type=str, default="baseline", help="Run name")
+    parser.add_argument("--task", type=int, help="Task number", default=2)
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--device", type=str, default="cuda", help="Device to use")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        choices=list(DATASET_REGISTRY.keys()),
+        required=True,
+    )
+    parser.add_argument(
+        "--loss", type=str, choices=list(LOSS_REGISTRY.keys()), required=True
+    )
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument(
+        "--n_patience", type=int, default=10, help="Number of patience epochs"
+    )
+    parser.add_argument("--input_size", type=int, help="Image size", required=True)
+    parser.add_argument(
+        "--model_name", type=str, help="Model name", choices=list(MODEL_REGISTRY.keys())
+    )
+    parser.add_argument(
+        "--smp",
+        nargs="+",
+        action=SetSMPArgs,
+        help=(
+            "Set SMP encoder name and weights \n"
+            "For example:"
+            "--smp 'encoder_name:efficientnet-b4' 'encoder_weights:imagenet'"
+        ),
+    )
+    parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
+    parser.add_argument(
+        "--sa", choices=list(AUG_REGISTRY.keys()), help="Use stain augmentation"
+    )
     parser.add_argument("-a", "--aggregation", type=str, help="Aggregation")
     parser = parser.parse_args(namespace=args)
 
