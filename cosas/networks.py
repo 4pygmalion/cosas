@@ -470,7 +470,7 @@ class MultiTaskAE(torch.nn.Module):
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
         recon = torch.clip(recon, -1, 1)
 
-        return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
+        return {"recon": recon, "vector": stain_vectors, "density": stain_density}
 
     def forward(self, x):
         w, h = x.shape[-2:]
@@ -478,7 +478,7 @@ class MultiTaskAE(torch.nn.Module):
         output = self.reconstruction(x)
         recon = output["recon"]
         vector = output["vector"]
-        density = output["denisty"]
+        density = output["density"]
 
         batch_size = x.shape[0]
         stain_info = torch.concat(
@@ -490,7 +490,7 @@ class MultiTaskAE(torch.nn.Module):
             "recon": recon,
             "mask": self.mask_head(stain_info),
             "vector": output["vector"],
-            "density": output["denisty"],
+            "density": output["density"],
         }
 
 
@@ -543,7 +543,7 @@ class MultiTaskTransAE(torch.nn.Module):
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
         recon = torch.clip(recon, -1, 1)
 
-        return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
+        return {"recon": recon, "vector": stain_vectors, "density": stain_density}
 
     def forward(self, x):
         w, h = x.shape[-2:]
@@ -551,7 +551,7 @@ class MultiTaskTransAE(torch.nn.Module):
         output = self.reconstruction(x)
         recon = output["recon"]
         vector = output["vector"]
-        density = output["denisty"]
+        density = output["density"]
 
         batch_size = x.shape[0]
         stain_info = torch.concat(
@@ -563,7 +563,7 @@ class MultiTaskTransAE(torch.nn.Module):
             "recon": recon,
             "mask": self.mask_head(stain_info),
             "vector": output["vector"],
-            "density": output["denisty"],
+            "density": output["density"],
         }
 
 
@@ -893,7 +893,7 @@ class StainReconSegformer(torch.nn.Module):
         stain_density = self.stain_density_decoder(z)  # (B, 2, W, H)
         recon = torch.einsum("bscwh,bswh->bcwh", stain_matrix, stain_density)
 
-        return {"recon": recon, "vector": stain_matrix, "denisty": stain_density}
+        return {"recon": recon, "vector": stain_matrix, "density": stain_density}
 
     def forward(self, x):
         w, h = x.shape[-2:]
@@ -903,7 +903,7 @@ class StainReconSegformer(torch.nn.Module):
         output = self.reconstruction(x)
         recon = output["recon"]
         vector = output["vector"]
-        density = output["denisty"]
+        density = output["density"]
 
         batch_size = x.shape[0]
         stain_info = torch.concat(
@@ -922,7 +922,7 @@ class StainReconSegformer(torch.nn.Module):
                 self.mask_head(stain_info), size=(w, h), mode="bilinear"
             ),
             "vector": output["vector"],
-            "density": output["denisty"],
+            "density": output["density"],
         }
 
 
@@ -971,6 +971,73 @@ class StainPredictSegformer(torch.nn.Module):
         }
 
 
+class ImagelevelMultiTaskAE(torch.nn.Module):
+    def __init__(self, architecture: str, encoder_name, input_size=(224, 224)):
+        super(ImagelevelMultiTaskAE, self).__init__()
+
+        self.encoder_name = encoder_name
+        self.input_size = input_size
+        self.architecture = getattr(smp, architecture)(
+            encoder_name=self.encoder_name, classes=6
+        )
+
+        self.stain_vec_head = self.architecture.segmentation_head
+
+        self.encoder = self.architecture.encoder
+        self.stain_den = UnetDecoder(
+            encoder_channels=self.encoder.out_channels,
+            decoder_channels=(256, 128, 64, 32, 2),
+        )
+        self.stain_den_head = SegmentationHead(
+            in_channels=2, out_channels=2, activation=None
+        )
+        self.mask_head = SegmentationHead(
+            in_channels=8, out_channels=1, activation=None
+        )
+        self.classifier = ClassificationHead(
+            in_channels=8,
+            classes=1,
+        )
+
+    def reconstruction(self, x):
+        z = self.architecture.encoder(x)
+
+        # Stain vectors (B, 2, 3, W, H)
+        x = self.architecture.decoder(*z)  # (6, W, H)
+        x = self.stain_vec_head(x)  # (B, 6, W, H)
+        stain_vectors = x.view(-1, 2, 3, *self.input_size)  # (B, 2, 3, W, H)
+
+        # Stain Density (B, 2, W, H)
+        x_d = self.stain_den(*z)  # (B, 2, W, H)
+        stain_density = self.stain_den_head(x_d)
+
+        recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
+
+        return {"recon": recon, "vector": stain_vectors, "density": stain_density}
+
+    def forward(self, x):
+        w, h = x.shape[-2:]
+
+        output = self.reconstruction(x)
+        recon = output["recon"]
+        vector = output["vector"]
+        density = output["density"]
+
+        batch_size = x.shape[0]
+        stain_info = torch.concat(
+            [vector.view(batch_size, -1, w, h), density.view(batch_size, -1, w, h)],
+            axis=1,
+        )
+
+        return {
+            "recon": recon,
+            "mask": self.mask_head(stain_info),
+            "logit": self.classifier(stain_info),
+            "vector": output["vector"],
+            "density": output["density"],
+        }
+
+
 MODEL_REGISTRY = {
     "pyramid": PyramidSeg,
     "transunet": TransUNet,
@@ -980,4 +1047,5 @@ MODEL_REGISTRY = {
     "siamformer": Siamformer,
     "recon_segformer": StainReconSegformer,
     "stainsegformer": StainPredictSegformer,
+    "imagelevel_multitask": ImagelevelMultiTaskAE,
 }

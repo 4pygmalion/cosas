@@ -425,21 +425,14 @@ class AETrainer(BinaryClassifierTrainer):
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-        i = 0
-        for step, batch in enumerate(dataloader):
-            xs, ys = batch
-            xs = xs.to(self.device)
-            ys = ys.to(self.device)
 
+        for step, batch in enumerate(dataloader):
+            xs, ys, aux = batch
+            xs, ys, aux = map(lambda x: x.to(self.device), [xs, ys, aux])
             if phase == "train":
                 outputs = self.model(xs)
-                recon_x = outputs["recon"]
-                logits = outputs["mask"]
-                vector = outputs["vector"]
-                density = outputs["density"]
-
-                logits = logits.view(ys.shape)
-                loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
+                outputs.update({"x": xs, "y": ys, "target": aux})
+                loss = self.loss(**outputs)
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -448,17 +441,13 @@ class AETrainer(BinaryClassifierTrainer):
             else:
                 with torch.no_grad():
                     outputs = self.model(xs)
-                    recon_x = outputs["recon"]
-                    logits = outputs["mask"]
-                    vector = outputs["vector"]
-                    density = outputs["density"]
-                    logits = logits.view(ys.shape)
-                    loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
+                    outputs.update({"x": xs, "y": ys, "target": aux})
+                    loss = self.loss(**outputs)
 
             # metric
             loss_meter.update(loss.item(), len(ys))
 
-            images_confidences = torch.sigmoid(logits)
+            images_confidences = torch.sigmoid(outputs["mask"]).view(ys.shape)
             flat_confidence = images_confidences.flatten().detach().cpu().numpy()
             ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
 

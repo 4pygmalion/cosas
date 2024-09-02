@@ -239,13 +239,15 @@ class ReconMCCLoss(torch.nn.Module):
         self.use_sparisty_loss = use_sparisty_loss
         self.alpha = alpha
 
-    def forward(self, recon_x, x, logits, targets, vector, desnity):
-        mask_error = self.mcc(logits, targets)
-        recon_error = torch.nn.functional.mse_loss(recon_x, x)
+    def forward(self, recon, x, mask, y, **kwargs):
+        mask_error = self.mcc(mask, y)
+        recon_error = torch.nn.functional.mse_loss(recon, x)
         loss = mask_error + self.alpha * recon_error
 
         if self.use_sparisty_loss:
-            sparisty_penalty = self.sparsity_loss(vector, desnity)
+            vector = kwargs["vector"]
+            density = kwargs["density"]
+            sparisty_penalty = self.sparsity_loss(vector, density)
             loss += sparisty_penalty
             return loss
 
@@ -260,17 +262,35 @@ class ReconIoULoss(torch.nn.Module):
         self.use_sparisty_loss = use_sparisty_loss
         self.alpha = alpha
 
-    def forward(self, recon_x, x, logits, targets, vector, desnity):
-        mask_error = self.iou(logits, targets)
-        recon_error = torch.nn.functional.mse_loss(recon_x, x)
+    def forward(self, recon, x, mask, y, **kwargs):
+        mask_error = self.iou(mask, y)
+        recon_error = torch.nn.functional.mse_loss(recon, x)
         loss = mask_error + self.alpha * recon_error
 
         if self.use_sparisty_loss:
-            sparisty_penalty = self.sparsity_loss(vector, desnity)
+            vector = kwargs["vector"]
+            density = kwargs["density"]
+            sparisty_penalty = self.sparsity_loss(vector, density)
             loss += sparisty_penalty
             return loss
 
         return loss
+
+
+class ImageLevelMultiTask(torch.nn.Module):
+    def __init__(self, alpha: float = 1):
+        super(ImageLevelMultiTask, self).__init__()
+        self.iou = IoULoss()
+        self.alpha = alpha
+
+    def forward(self, recon, x, mask, y, logit, target, **kwargs):
+        recon_error = torch.nn.functional.mse_loss(recon, x)
+        mask_error = self.iou(mask, y)
+        image_level_error = torch.nn.functional.binary_cross_entropy_with_logits(
+            logit, target
+        )
+
+        return mask_error + self.alpha * recon_error + image_level_error
 
 
 class StainLoss(torch.nn.Module):
@@ -297,4 +317,5 @@ LOSS_REGISTRY = {
     "recon_mcc": ReconMCCLoss,
     "recon_iou": ReconIoULoss,
     "stain-loss": StainLoss,
+    "image_level_aux": ImageLevelMultiTask,
 }

@@ -305,12 +305,47 @@ class StainDataset(Dataset):
 
             # stride가 negative인 경우 처리
             if isinstance(mask, torch.Tensor):
-                mask = torch.from_numpy(mask.numpy().copy())
+                mask = mask.clone()
             return image, mask, stain_desnity
 
         else:
             image = torch.from_numpy(image.copy())
             mask = torch.from_numpy(mask.copy())
+
+
+class ImageMaskAuxillaryLabelDataset(Dataset):
+    def __init__(
+        self, images, masks, transform: A.Compose | None = None, device="cuda"
+    ):
+        self.images = images
+        self.masks = masks
+        self.transform = transform
+        self.device = device
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        image = self.images[idx]
+        mask = self.masks[idx]
+
+        # self.transform: np.ndarray -> Dict[str, Tensor]
+        if self.transform:
+            augmented = self.transform(image=image, mask=mask)
+            image, mask = augmented["image"], augmented["mask"]
+
+            # stride가 negative인 경우 처리
+            if isinstance(mask, torch.Tensor):
+                mask = mask.clone()
+
+            label = torch.tensor([1.0]) if mask.sum() > 0 else torch.tensor([0.0])
+            return image, mask, label
+
+        else:
+            image = torch.from_numpy(image.copy())
+            mask = torch.from_numpy(mask.copy())
+            label = torch.tensor([1.0]) if mask.sum() > 0 else torch.tensor([0.0])
+            return image, mask, label
 
 
 DATASET_REGISTRY = {
@@ -320,4 +355,5 @@ DATASET_REGISTRY = {
     "multiscale": MultiScaleDataset,
     "supercon": SupConDataset,
     "stain": StainDataset,
+    "image_mask_aux": ImageMaskAuxillaryLabelDataset,
 }

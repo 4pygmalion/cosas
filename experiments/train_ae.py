@@ -49,6 +49,7 @@ def get_config() -> argparse.ArgumentParser:
         "--dataset",
         type=str,
         default="image_mask",
+        choices=list(DATASET_REGISTRY.keys()),
         required=False,
     )
     parser.add_argument(
@@ -238,8 +239,8 @@ if __name__ == "__main__":
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
             # MODEL
-            if args.model_name == "autoencoder":
-                model = MultiTaskAE(
+            if args.model_name in ("autoencoder", "imagelevel_multitask"):
+                model = MODEL_REGISTRY[args.model_name](
                     architecture=args.architecture,
                     encoder_name=args.encoder_name,
                     input_size=(args.input_size, args.input_size),
