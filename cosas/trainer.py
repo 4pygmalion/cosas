@@ -447,10 +447,10 @@ class AETrainer(BinaryClassifierTrainer):
                 outputs = self.model(xs)
                 outputs.update({"x": xs, "y": ys, "target": aux})
                 loss = self.loss(**outputs)
+
+                self.optimizer.zero_grad()
                 loss.backward()
-                if step % update_step == 0 or step == len(dataloader):
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
+                self.optimizer.step()
 
             else:
                 with torch.no_grad():
