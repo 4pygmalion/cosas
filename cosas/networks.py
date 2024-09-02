@@ -1057,17 +1057,31 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
         )
         self.model2 = Segformer()
         self.aggregation_method = aggregation_method
-        self.agg_layer = self._choose_agg_layer(aggregation_method)
+        self._init_agg_layer(aggregation_method)
 
-    def _choose_agg_layer(self, aggregation_method: str) -> callable:
-        self.fusion = torch.nn.Sequential(
-            torch.nn.Linear(2, 8), torch.nn.ReLU(), torch.nn.Linear(8, 1)
-        )
+    def _init_agg_layer(self, aggregation_method: str) -> callable:
+        class FusionModule(torch.nn.Module):
+            def __init__(self):
+                super(FusionModule, self).__init__()
+                self.layer = torch.nn.Sequential(
+                    torch.nn.Linear(2, 8), torch.nn.ReLU(), torch.nn.Linear(8, 1)
+                )
+
+            def forward(self, x):
+                return self.layer(x)
+
+        class MajorityVoting(torch.nn.Module):
+            def forward(self, z):
+                return torch.mode(z, dim=1).values
+
+        class MaxConfidence(torch.nn.Module):
+            def forward(self, z):
+                return torch.max(z, dim=1).values
 
         agg_layers = {
-            "majority_voting": self.majority_voting,
-            "max_confidence": self.max_confidence,
-            "meta": self.fusion,
+            "majority_voting": MajorityVoting,
+            "max_confidence": MaxConfidence,
+            "meta": FusionModule,
         }
 
         if aggregation_method not in agg_layers:
@@ -1076,7 +1090,9 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
                 f"aggregation_method must be in {methods}, passed {aggregation_method}"
             )
 
-        return agg_layers[aggregation_method]
+        self.agg_layer = agg_layers[aggregation_method]()
+
+        return
 
     def majority_voting(self, z):
         return torch.mode(z, dim=1).values
