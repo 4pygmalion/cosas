@@ -305,7 +305,7 @@ class StainDataset(Dataset):
 
             # stride가 negative인 경우 처리
             if isinstance(mask, torch.Tensor):
-                mask = torch.from_numpy(mask.numpy().copy())
+                mask = mask.clone()
             return image, mask, stain_desnity
 
         else:
@@ -336,7 +336,7 @@ class ImageMaskAuxillaryLabelDataset(Dataset):
 
             # stride가 negative인 경우 처리
             if isinstance(mask, torch.Tensor):
-                mask = torch.from_numpy(mask.numpy().copy())
+                mask = mask.clone()
 
             label = torch.tensor([1.0]) if mask.sum() > 0 else torch.tensor([0.0])
             return image, mask, label
