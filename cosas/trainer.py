@@ -427,8 +427,14 @@ class AETrainer(BinaryClassifierTrainer):
         loss_meter = AverageMeter("loss")
 
         for step, batch in enumerate(dataloader):
-            xs, ys, aux = batch
-            xs, ys, aux = map(lambda x: x.to(self.device), [xs, ys, aux])
+            if len(batch) == 3:
+                xs, ys, aux = batch
+                xs, ys, aux = map(lambda x: x.to(self.device), [xs, ys, aux])
+            elif len(batch) == 2:
+                xs, ys = batch
+                aux = None
+                xs, ys = map(lambda x: x.to(self.device), [xs, ys])
+
             if phase == "train":
                 outputs = self.model(xs)
                 outputs.update({"x": xs, "y": ys, "target": aux})
