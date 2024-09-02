@@ -303,6 +303,8 @@ def main():
 
             if args.postprocess:
                 postprocess = POSTPROCESS_REGISTRY[args.postprocess]
+            else:
+                postprocess = None
 
             metrics = process_fold(
                 val_dataloader,
