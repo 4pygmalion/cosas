@@ -449,7 +449,6 @@ class AETrainer(BinaryClassifierTrainer):
                 loss = self.loss(**outputs)
                 loss.backward()
                 if step % update_step == 0 or step == len(dataloader):
-                    print("step called")
                     self.optimizer.step()
                     self.optimizer.zero_grad()
 
