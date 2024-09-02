@@ -1,6 +1,6 @@
-from typing import Optional, List, Union
-
+from typing import Optional, List, Union, Literal
 from copy import deepcopy
+
 import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
@@ -1050,7 +1050,12 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
 
     """
 
-    def __init__(self, aggregation_method="majority_voting"):
+    def __init__(
+        self,
+        aggregation_method: Literal[
+            "majority_voting", "max_confidence", "meta"
+        ] = "majority_voting",
+    ):
         super(EnsembleModel_Segform_MTaskAE, self).__init__()
         self.model1 = MultiTaskAE(
             architecture="Unet", encoder_name="efficientnet-b7", input_size=(640, 640)
