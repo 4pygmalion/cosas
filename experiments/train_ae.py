@@ -45,6 +45,7 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument("--epochs", type=int, default=200, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
+    parser.add_argument("--update_step", type=int, default=1, help="Update step")
     parser.add_argument(
         "--dataset",
         type=str,
@@ -274,6 +275,7 @@ if __name__ == "__main__":
                     val_dataloader,
                     epochs=args.epochs,
                     n_patience=args.n_patience,
+                    update_step=args.update_step,
                 )
                 mlflow.pytorch.log_model(model, "model")
 

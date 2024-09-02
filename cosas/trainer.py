@@ -97,6 +97,7 @@ class BinaryClassifierTrainer(ABC):
         phase: Literal["train", "val", "test"],
         threshold: float = 0.5,
         save_plot: bool = False,
+        update_step: int = 1,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.
@@ -109,6 +110,8 @@ class BinaryClassifierTrainer(ABC):
             phase (str): training or validation
             epoch (int): epoch
             dataloader (torch.utils.data.DataLoader): dataset (train or validation)
+            update_step: 훈련 중 각 업데이트 사이의 단계 수. 1의 값은 매 단계마다 업데이트를 의미합니다 (기본값).
+                더 높은 값은 그래디언트 누적에 사용될 수 있습니다.
 
         Returns:
             Tuple: loss, accuracy, top_k_recall
@@ -125,8 +128,8 @@ class BinaryClassifierTrainer(ABC):
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-        i = 0
-        for step, batch in enumerate(dataloader):
+
+        for step, batch in enumerate(dataloader, start=1):
             xs, ys = batch
             xs = xs.to(self.device)
             ys = ys.to(self.device)
@@ -136,9 +139,9 @@ class BinaryClassifierTrainer(ABC):
                 logits = logits.view(ys.shape)
                 loss = self.loss(logits, ys.float())
 
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+                if step % update_step == 0 or step == len(dataloader):
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
 
             else:
                 with torch.no_grad():
@@ -186,6 +189,7 @@ class BinaryClassifierTrainer(ABC):
         val_dataloader: DataLoader,
         epochs: int,
         n_patience: int,
+        update_step: int = 1,
     ):
 
         best_state_dict = deepcopy(self.model.state_dict())
@@ -193,7 +197,10 @@ class BinaryClassifierTrainer(ABC):
         patience = 0
         for epoch in range(epochs):
             train_loss, train_metrics = self.run_epoch(
-                dataloader=train_dataloader, epoch=epoch, phase="train"
+                dataloader=train_dataloader,
+                epoch=epoch,
+                phase="train",
+                update_step=update_step,
             )
             mlflow.log_metric("train_loss", train_loss.avg, step=epoch)
             mlflow.log_metrics(train_metrics.to_dict(prefix="train_"), step=epoch)
@@ -397,6 +404,7 @@ class AETrainer(BinaryClassifierTrainer):
         phase: Literal["train", "val", "test"],
         threshold: float = 0.5,
         save_plot: bool = False,
+        update_step: int = 1,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.
@@ -426,7 +434,7 @@ class AETrainer(BinaryClassifierTrainer):
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
 
-        for step, batch in enumerate(dataloader):
+        for step, batch in enumerate(dataloader, start=1):
             if len(batch) == 3:
                 xs, ys, aux = batch
                 xs, ys, aux = map(lambda x: x.to(self.device), [xs, ys, aux])
@@ -439,10 +447,10 @@ class AETrainer(BinaryClassifierTrainer):
                 outputs = self.model(xs)
                 outputs.update({"x": xs, "y": ys, "target": aux})
                 loss = self.loss(**outputs)
-
-                self.optimizer.zero_grad()
                 loss.backward()
-                self.optimizer.step()
+                if step % update_step == 0 or step == len(dataloader):
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
 
             else:
                 with torch.no_grad():
