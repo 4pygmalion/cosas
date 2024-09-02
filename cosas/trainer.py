@@ -110,6 +110,8 @@ class BinaryClassifierTrainer(ABC):
             phase (str): training or validation
             epoch (int): epoch
             dataloader (torch.utils.data.DataLoader): dataset (train or validation)
+            update_step: 훈련 중 각 업데이트 사이의 단계 수. 1의 값은 매 단계마다 업데이트를 의미합니다 (기본값).
+                더 높은 값은 그래디언트 누적에 사용될 수 있습니다.
 
         Returns:
             Tuple: loss, accuracy, top_k_recall
