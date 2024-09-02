@@ -1038,6 +1038,64 @@ class ImagelevelMultiTaskAE(torch.nn.Module):
         }
 
 
+class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
+    """
+    # continual learning
+    >>> model = EnsembleModel()
+    >>> model1 = mlflow.pytorch.load_model()
+    >>> model.model1.params = model1
+
+    # init
+    >>> model = EnsembleModel()
+
+    """
+
+    def __init__(self, aggregation_method="majority_voting"):
+        super(EnsembleModel_Segform_MTaskAE, self).__init__()
+        self.model1 = MultiTaskAE(
+            architecture="Unet", encoder_name="efficientnet-b7", input_size=(640, 640)
+        )
+        self.model2 = Segformer()
+        self.aggregation_method = aggregation_method
+
+    def majority_voting(self, outputs):
+        stacked_outputs = torch.stack(outputs, dim=0)
+        voted_output = torch.mode(stacked_outputs, dim=0).values
+        return voted_output
+
+    def max_confidence(self, outputs):
+        stacked_outputs = torch.stack(outputs, dim=0)
+        max_conf_output, _ = torch.max(stacked_outputs, dim=0).values
+        return max_conf_output
+
+    def forward(self, x):
+        """
+        AE input_size = 640
+        Segformer input_size = 512
+        """
+        x1 = torch.nn.functional.interpolate(x, size=640, mode="bilinear")
+        x2 = torch.nn.functional.interpolate(x, size=512, mode="bilinear")
+
+        output1 = torch.nn.functional.interpolate(
+            self.model1(x1)["mask"], size=512, mode="bilinear"
+        )
+        output2 = self.model2(x2)
+
+        if self.aggregation_method == "majority_voting":
+            output = self.majority_voting([output1, output2])
+
+        elif self.aggregation_method == "max_confidence":
+            output = self.max_confidence([output1, output2])
+
+        else:
+            raise ValueError(
+                "Unsupported aggregation method. "
+                "Choose 'majority_voting', or 'max_confidence'"
+            )
+
+        return output
+
+
 MODEL_REGISTRY = {
     "pyramid": PyramidSeg,
     "transunet": TransUNet,
@@ -1048,4 +1106,5 @@ MODEL_REGISTRY = {
     "recon_segformer": StainReconSegformer,
     "stainsegformer": StainPredictSegformer,
     "imagelevel_multitask": ImagelevelMultiTaskAE,
+    "ensemble_segform_multitaskae": EnsembleModel_Segform_MTaskAE,
 }
