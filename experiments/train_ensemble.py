@@ -20,6 +20,7 @@ from cosas.transforms import (
     get_lab_distribution,
     AUG_REGISTRY,
 )
+from cosas.networks import MODEL_REGISTRY
 from cosas.losses import LOSS_REGISTRY
 from cosas.misc import set_seed, get_config
 from cosas.trainer import BinaryClassifierTrainer
