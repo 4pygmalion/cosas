@@ -1078,15 +1078,11 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
 
         return agg_layers[aggregation_method]
 
-    def majority_voting(self, outputs):
-        stacked_outputs = torch.stack(outputs, dim=1)
-        voted_output = torch.mode(stacked_outputs, dim=1).values
-        return voted_output
+    def majority_voting(self, z):
+        return torch.mode(z, dim=1).values
 
-    def max_confidence(self, outputs):
-        stacked_outputs = torch.stack(outputs, dim=1)
-        max_conf_output, _ = torch.max(stacked_outputs, dim=1).values
-        return max_conf_output
+    def max_confidence(self, z):
+        return torch.max(z, dim=1).values
 
     def forward(self, x):
         """
