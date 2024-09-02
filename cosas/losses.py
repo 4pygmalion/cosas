@@ -290,9 +290,7 @@ class ImageLevelMultiTask(torch.nn.Module):
             logit, target
         )
 
-        loss = mask_error + self.alpha * recon_error + image_level_error
-
-        return loss
+        return mask_error + self.alpha * recon_error + image_level_error
 
 
 class StainLoss(torch.nn.Module):

@@ -470,7 +470,7 @@ class MultiTaskAE(torch.nn.Module):
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
         recon = torch.clip(recon, -1, 1)
 
-        return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
+        return {"recon": recon, "vector": stain_vectors, "density": stain_density}
 
     def forward(self, x):
         w, h = x.shape[-2:]
@@ -478,7 +478,7 @@ class MultiTaskAE(torch.nn.Module):
         output = self.reconstruction(x)
         recon = output["recon"]
         vector = output["vector"]
-        density = output["denisty"]
+        density = output["density"]
 
         batch_size = x.shape[0]
         stain_info = torch.concat(
@@ -490,7 +490,7 @@ class MultiTaskAE(torch.nn.Module):
             "recon": recon,
             "mask": self.mask_head(stain_info),
             "vector": output["vector"],
-            "density": output["denisty"],
+            "density": output["density"],
         }
 
 
@@ -543,7 +543,7 @@ class MultiTaskTransAE(torch.nn.Module):
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
         recon = torch.clip(recon, -1, 1)
 
-        return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
+        return {"recon": recon, "vector": stain_vectors, "density": stain_density}
 
     def forward(self, x):
         w, h = x.shape[-2:]
@@ -551,7 +551,7 @@ class MultiTaskTransAE(torch.nn.Module):
         output = self.reconstruction(x)
         recon = output["recon"]
         vector = output["vector"]
-        density = output["denisty"]
+        density = output["density"]
 
         batch_size = x.shape[0]
         stain_info = torch.concat(
@@ -563,7 +563,7 @@ class MultiTaskTransAE(torch.nn.Module):
             "recon": recon,
             "mask": self.mask_head(stain_info),
             "vector": output["vector"],
-            "density": output["denisty"],
+            "density": output["density"],
         }
 
 
@@ -893,7 +893,7 @@ class StainReconSegformer(torch.nn.Module):
         stain_density = self.stain_density_decoder(z)  # (B, 2, W, H)
         recon = torch.einsum("bscwh,bswh->bcwh", stain_matrix, stain_density)
 
-        return {"recon": recon, "vector": stain_matrix, "denisty": stain_density}
+        return {"recon": recon, "vector": stain_matrix, "density": stain_density}
 
     def forward(self, x):
         w, h = x.shape[-2:]
@@ -903,7 +903,7 @@ class StainReconSegformer(torch.nn.Module):
         output = self.reconstruction(x)
         recon = output["recon"]
         vector = output["vector"]
-        density = output["denisty"]
+        density = output["density"]
 
         batch_size = x.shape[0]
         stain_info = torch.concat(
@@ -922,7 +922,7 @@ class StainReconSegformer(torch.nn.Module):
                 self.mask_head(stain_info), size=(w, h), mode="bilinear"
             ),
             "vector": output["vector"],
-            "density": output["denisty"],
+            "density": output["density"],
         }
 
 
@@ -1012,9 +1012,8 @@ class ImagelevelMultiTaskAE(torch.nn.Module):
         stain_density = self.stain_den_head(x_d)
 
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
-        recon = torch.clip(recon, -1, 1)
 
-        return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
+        return {"recon": recon, "vector": stain_vectors, "density": stain_density}
 
     def forward(self, x):
         w, h = x.shape[-2:]
@@ -1022,7 +1021,7 @@ class ImagelevelMultiTaskAE(torch.nn.Module):
         output = self.reconstruction(x)
         recon = output["recon"]
         vector = output["vector"]
-        density = output["denisty"]
+        density = output["density"]
 
         batch_size = x.shape[0]
         stain_info = torch.concat(
@@ -1035,7 +1034,7 @@ class ImagelevelMultiTaskAE(torch.nn.Module):
             "mask": self.mask_head(stain_info),
             "logit": self.classifier(stain_info),
             "vector": output["vector"],
-            "density": output["denisty"],
+            "density": output["density"],
         }
 
 
