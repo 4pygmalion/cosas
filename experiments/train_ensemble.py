@@ -1,4 +1,5 @@
 import os
+import argparse
 
 import mlflow
 import segmentation_models_pytorch as smp
@@ -42,6 +43,16 @@ def stain_normalization(train_images, val_images, test_images):
     test_images = [reinhard(image, means, stds) for image in test_images]
 
     return train_images, val_images, test_images
+
+
+def extended_args() -> argparse.Namespace:
+    args = get_config()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-a", "--aggregation", type=str, help="Aggregation")
+    parser = parser.parse_args(namespace=args)
+
+    return parser
 
 
 if __name__ == "__main__":

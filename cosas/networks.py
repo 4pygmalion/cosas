@@ -1057,15 +1057,35 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
         )
         self.model2 = Segformer()
         self.aggregation_method = aggregation_method
+        self.agg_layer = self._choose_agg_layer(aggregation_method)
+
+    def _choose_agg_layer(self, aggregation_method: str) -> callable:
+        self.fusion = torch.nn.Sequential(
+            torch.nn.Linear(2, 8), torch.nn.ReLU(), torch.nn.Linear(8, 1)
+        )
+
+        agg_layers = {
+            "majority_voting": self.majority_voting,
+            "max_confidence": self.max_confidence,
+            "meta": self.fusion,
+        }
+
+        if aggregation_method not in agg_layers:
+            methods = ",".join(list(agg_layers.keys()))
+            raise NotImplementedError(
+                f"aggregation_method must be in {methods}, passed {aggregation_method}"
+            )
+
+        return agg_layers[aggregation_method]
 
     def majority_voting(self, outputs):
-        stacked_outputs = torch.stack(outputs, dim=0)
-        voted_output = torch.mode(stacked_outputs, dim=0).values
+        stacked_outputs = torch.stack(outputs, dim=1)
+        voted_output = torch.mode(stacked_outputs, dim=1).values
         return voted_output
 
     def max_confidence(self, outputs):
-        stacked_outputs = torch.stack(outputs, dim=0)
-        max_conf_output, _ = torch.max(stacked_outputs, dim=0).values
+        stacked_outputs = torch.stack(outputs, dim=1)
+        max_conf_output, _ = torch.max(stacked_outputs, dim=1).values
         return max_conf_output
 
     def forward(self, x):
@@ -1081,19 +1101,9 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
         )
         output2 = self.model2(x2)
 
-        if self.aggregation_method == "majority_voting":
-            output = self.majority_voting([output1, output2])
+        z = torch.stack([output1, output2], dim=1)  # B, Feature, W, H
 
-        elif self.aggregation_method == "max_confidence":
-            output = self.max_confidence([output1, output2])
-
-        else:
-            raise ValueError(
-                "Unsupported aggregation method. "
-                "Choose 'majority_voting', or 'max_confidence'"
-            )
-
-        return output
+        return self.agg_layer(z)
 
 
 MODEL_REGISTRY = {
