@@ -88,8 +88,13 @@ def extended_args() -> argparse.Namespace:
     parser.add_argument(
         "--sa", choices=list(AUG_REGISTRY.keys()), help="Use stain augmentation"
     )
-    parser.add_argument("-a", "--aggregation", type=str, help="Aggregation")
-    parser = parser.parse_args(namespace=args)
+    parser.add_argument(
+        "-a",
+        "--aggregation",
+        type=str,
+        help="Aggregation",
+        choices=["majority_voting", "max_confidence", "meta"],
+    )
 
     return parser
 
