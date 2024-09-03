@@ -233,11 +233,13 @@ class SSLTrainer(ABC):
         loss: torch.nn.modules.loss._Loss,
         device: str = "cuda",
         optimizer: torch.optim.Optimizer = None,
+        scheduler=None,
         logger: logging.Logger = None,
     ):
         self.model = model
         self.loss = loss
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.device = device
         self.logger = (
             logging.Logger("BinaryClassifierTrainer") if logger is None else logger
@@ -369,6 +371,8 @@ class SSLTrainer(ABC):
                 dataloader=train_dataloader, epoch=epoch, phase="train"
             )
             mlflow.log_metric("train_loss", train_loss.avg, step=epoch)
+            if self.scheduler:
+                self.scheduler.step()
 
         mlflow.pytorch.log_model(self.model, "encoder")
 
