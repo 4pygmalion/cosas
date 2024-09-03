@@ -218,8 +218,8 @@ if __name__ == "__main__":
             # Get model params for ensemble learning (continual)
             # Model1 - MultiTaskAE - ae_efficietnet-b7_mix_fold4
             # Model2 - Segformer - segformer_iou_fold4
-            model1_uri = "/vast/AI_team/mlflow_artifact/13/f7fdd3b7ef354160ab8fd4882ec2be35/artifacts/model"
-            model2_uri = "/vast/AI_team/mlflow_artifact/13/c0f3923ab34842648faf50de6e4f832f/artifacts/model"
+            model1_uri = "/vast/AI_team/mlflow_artifact/13/8681c47d4dc4453da6c38361347170a2/artifacts/model"
+            model2_uri = "/vast/AI_team/mlflow_artifact/13/58962ca27d534d548e5b9d96d35f9273/artifacts/model"
 
             model1_state_dict = mlflow.pytorch.load_model(model1_uri).state_dict()
             model2_state_dict = mlflow.pytorch.load_model(model2_uri).state_dict()
