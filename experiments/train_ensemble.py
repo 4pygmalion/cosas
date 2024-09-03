@@ -211,7 +211,9 @@ if __name__ == "__main__":
                         args.device
                     )
                 else:
-                    model = MODEL_REGISTRY[args.model_name]().to(args.device)
+                    model = MODEL_REGISTRY[args.model_name](
+                        aggregation_method=args.aggregation
+                    ).to(args.device)
 
             # Get model params for ensemble learning (continual)
             # Model1 - MultiTaskAE - ae_efficietnet-b7_mix_fold4
