@@ -1,4 +1,5 @@
 import os
+import math
 import argparse
 
 import mlflow
@@ -73,6 +74,8 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument(
         "--architecture", type=str, required=False, choices=arch_choices
     )
+    parser.add_argument("--weight_decay", default=0.05)
+    parser.add_argument("--warmup_epoch", type=int, default=5)
     parser.add_argument("--encoder_name", type=str, required=False)
 
     parser.add_argument("--use_sparisty_loss", action="store_true", default=False)
@@ -205,10 +208,24 @@ if __name__ == "__main__":
             model = model.to(args.device)
             dp_model = torch.nn.DataParallel(model)
 
+            optim = torch.optim.AdamW(
+                model.parameters(),
+                lr=args.lr * args.batch_size / 256,
+                betas=(0.9, 0.999),
+                weight_decay=args.weight_decay,
+            )
+            lr_func = lambda epoch: min(
+                (epoch + 1) / (args.warmup_epoch + 1e-8),
+                0.5 * (math.cos(epoch / args.total_epoch * math.pi) + 1),
+            )
+            scheduler = torch.optim.lr_scheduler.LambdaLR(
+                optim, lr_lambda=lr_func, verbose=True
+            )
             trainer = AETrainer(
                 model=dp_model,
                 loss=AELoss(args.use_sparisty_loss, alpha=args.alpha),
-                optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+                optimizer=optim,
+                scheduler=scheduler,
                 device=args.device,
             )
 

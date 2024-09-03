@@ -382,11 +382,13 @@ class AETrainer(BinaryClassifierTrainer):
         loss: torch.nn.modules.loss._Loss,
         device: str = "cuda",
         optimizer: torch.optim.Optimizer = None,
+        scheduler: torch.optim.lr_scheduler._LRScheduler = None,
         logger: logging.Logger = None,
     ):
         self.model = model
         self.loss = loss
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.device = device
         self.logger = logging.Logger("AutoEncoderTrainer") if logger is None else logger
 
@@ -425,8 +427,7 @@ class AETrainer(BinaryClassifierTrainer):
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-        i = 0
-        for step, batch in enumerate(dataloader):
+        for step, batch in enumerate(dataloader, start=1):
             xs, ys = batch
             xs = xs.to(self.device)
             ys = ys.to(self.device)
@@ -440,10 +441,10 @@ class AETrainer(BinaryClassifierTrainer):
 
                 logits = logits.view(ys.shape)
                 loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
-
-                self.optimizer.zero_grad()
                 loss.backward()
-                self.optimizer.step()
+                if step % 4 == 0 or step == len(dataloader):
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
 
             else:
                 with torch.no_grad():
