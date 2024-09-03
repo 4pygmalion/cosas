@@ -809,38 +809,17 @@ class Siamformer(torch.nn.Module):
             x (torch.Tensor): x가 (1024, 1024)인 경우
         """
 
-        patches = torch.concat(
-            [
-                x[..., :512, :512],  # 좌상단 패치
-                x[..., :512, 512:],  # 우상단 패치
-                x[..., 512:, :512],  # 좌하단 패치
-                x[..., 512:, 512:],  # 우하단 패치
-            ],
-            dim=0,
-        )
-
-        segmenter_output = self.model.forward(patches)  # (N, c, 128, 128)
+        segmenter_output = self.model.forward(x)  # (N, c, H/4, W/4)
         logits = segmenter_output.logits
 
-        top = torch.concat([logits[0], logits[1]], dim=-1)
-        bottom = torch.concat([logits[2], logits[3]], dim=-1)
-        res = torch.concat([top, bottom], dim=-2).unsqueeze(0)
-
-        return torch.nn.functional.interpolate(res, size=self.size, mode="bilinear")
+        return torch.nn.functional.interpolate(logits, size=self.size, mode="bilinear")
 
     def forward(self, x: torch.Tensor):
         original_size = x.shape[-2:]
 
         logit_low_mag = self._forward_low_mag(x)
-
-        logit_high_mags = list()
-        for image_tensor in x:
-            logit_high_mag = self._forward_high_mag_one_image(image_tensor.unsqueeze(0))
-            logit_high_mags.append(logit_high_mag)
-
-        logit_high_mags = torch.concat(logit_high_mags, dim=0)
-
-        z = torch.concat([logit_low_mag, logit_high_mags], dim=1)  # (N, 2, W, H)
+        logit_igh_mag = self._forward_high_mag_one_image(x)
+        z = torch.concat([logit_low_mag, logit_igh_mag], dim=1)  # (N, 2, W, H)
 
         return torch.nn.functional.interpolate(
             self.zoom_pooling_conv(z),
