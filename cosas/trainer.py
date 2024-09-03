@@ -138,7 +138,7 @@ class BinaryClassifierTrainer(ABC):
                 logits = self.model(xs)
                 logits = logits.view(ys.shape)
                 loss = self.loss(logits, ys.float())
-
+                loss.backward()
                 if step % update_step == 0 or step == len(dataloader):
                     self.optimizer.step()
                     self.optimizer.zero_grad()
