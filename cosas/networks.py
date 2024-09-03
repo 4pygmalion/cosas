@@ -1069,9 +1069,7 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
             def __init__(self):
                 super(FusionModule, self).__init__()
                 self.layer = torch.nn.Sequential(
-                    torch.nn.Conv2d(2, 8, kernel_size=(1, 1), stride=(1, 1)),
-                    torch.nn.ReLU(),
-                    torch.nn.Conv2d(8, 1, kernel_size=(1, 1), stride=(1, 1)),
+                    torch.nn.Conv2d(2, 1, kernel_size=(1, 1), stride=(1, 1)),
                 )
 
             def forward(self, x):
