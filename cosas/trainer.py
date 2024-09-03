@@ -205,7 +205,7 @@ class BinaryClassifierTrainer(ABC):
             mlflow.log_metric("val_loss", val_loss.avg, step=epoch)
             mlflow.log_metrics(val_metrics.to_dict(prefix="val_"), step=epoch)
 
-            val_score = val_metrics.cosas_score
+            val_score = val_metrics.cosas_score.avg
             if best_metrics <= val_score:
                 best_metrics = val_score
                 patience = 0
