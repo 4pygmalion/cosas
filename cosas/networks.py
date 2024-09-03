@@ -1,6 +1,6 @@
-from typing import Optional, List, Union
-
+from typing import Optional, List, Union, Literal
 from copy import deepcopy
+
 import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
@@ -1050,23 +1050,54 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
 
     """
 
-    def __init__(self, aggregation_method="majority_voting"):
+    def __init__(
+        self,
+        aggregation_method: Literal[
+            "majority_voting", "max_confidence", "meta"
+        ] = "majority_voting",
+    ):
         super(EnsembleModel_Segform_MTaskAE, self).__init__()
         self.model1 = MultiTaskAE(
             architecture="Unet", encoder_name="efficientnet-b7", input_size=(640, 640)
         )
         self.model2 = Segformer()
         self.aggregation_method = aggregation_method
+        self._init_agg_layer(aggregation_method)
 
-    def majority_voting(self, outputs):
-        stacked_outputs = torch.stack(outputs, dim=0)
-        voted_output = torch.mode(stacked_outputs, dim=0).values
-        return voted_output
+    def _init_agg_layer(self, aggregation_method: str) -> callable:
+        class FusionModule(torch.nn.Module):
+            def __init__(self):
+                super(FusionModule, self).__init__()
+                self.layer = torch.nn.Sequential(
+                    torch.nn.Conv2d(2, 1, kernel_size=(1, 1), stride=(1, 1)),
+                )
 
-    def max_confidence(self, outputs):
-        stacked_outputs = torch.stack(outputs, dim=0)
-        max_conf_output, _ = torch.max(stacked_outputs, dim=0).values
-        return max_conf_output
+            def forward(self, x):
+                return self.layer(x)
+
+        class MajorityVoting(torch.nn.Module):
+            def forward(self, z):
+                return torch.mode(z, dim=1, keepdim=True).values
+
+        class MaxConfidence(torch.nn.Module):
+            def forward(self, z):
+                return torch.max(z, dim=1, keepdim=True).values
+
+        agg_layers = {
+            "majority_voting": MajorityVoting,
+            "max_confidence": MaxConfidence,
+            "meta": FusionModule,
+        }
+
+        if aggregation_method not in agg_layers:
+            methods = ",".join(list(agg_layers.keys()))
+            raise NotImplementedError(
+                f"aggregation_method must be in {methods}, passed {aggregation_method}"
+            )
+
+        self.agg_layer = agg_layers[aggregation_method]()
+
+        return
 
     def forward(self, x):
         """
@@ -1081,19 +1112,10 @@ class EnsembleModel_Segform_MTaskAE(torch.nn.Module):
         )
         output2 = self.model2(x2)
 
-        if self.aggregation_method == "majority_voting":
-            output = self.majority_voting([output1, output2])
+        # B, 1, W, H + B, 1, W, H -> B, 2, W, H
+        z = torch.concat([output1, output2], dim=1)
 
-        elif self.aggregation_method == "max_confidence":
-            output = self.max_confidence([output1, output2])
-
-        else:
-            raise ValueError(
-                "Unsupported aggregation method. "
-                "Choose 'majority_voting', or 'max_confidence'"
-            )
-
-        return output
+        return self.agg_layer(z)
 
 
 MODEL_REGISTRY = {

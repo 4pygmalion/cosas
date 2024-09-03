@@ -138,10 +138,10 @@ class BinaryClassifierTrainer(ABC):
                 logits = self.model(xs)
                 logits = logits.view(ys.shape)
                 loss = self.loss(logits, ys.float())
+
+                self.optimizer.zero_grad()
                 loss.backward()
-                if step % update_step == 0 or step == len(dataloader):
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
+                self.optimizer.step()
 
             else:
                 with torch.no_grad():
