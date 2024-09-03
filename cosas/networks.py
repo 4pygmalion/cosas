@@ -468,7 +468,7 @@ class MultiTaskAE(torch.nn.Module):
         stain_density = self.stain_den_head(x_d)
 
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
-        recon = torch.clip(recon, -1, 1)
+        # recon = torch.clip(recon, -1, 1)
 
         return {"recon": recon, "vector": stain_vectors, "denisty": stain_density}
 
