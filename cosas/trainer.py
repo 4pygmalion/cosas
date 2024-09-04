@@ -404,7 +404,6 @@ class AETrainer(BinaryClassifierTrainer):
         phase: Literal["train", "val", "test"],
         threshold: float = 0.5,
         save_plot: bool = False,
-        update_step: int = 1,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.
@@ -426,45 +425,47 @@ class AETrainer(BinaryClassifierTrainer):
         if phase == "train":
             self.model.train()
         else:
-            self.model.eval()
+            self.model.eval
 
         total_step = len(dataloader)
         bar = Bar(max=total_step, check_tty=False)
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-
-        for step, batch in enumerate(dataloader, start=1):
-            if len(batch) == 3:
-                xs, ys, aux = batch
-                xs, ys, aux = map(lambda x: x.to(self.device), [xs, ys, aux])
-            elif len(batch) == 2:
-                xs, ys = batch
-                aux = None
-                xs, ys = map(lambda x: x.to(self.device), [xs, ys])
+        i = 0
+        for step, batch in enumerate(dataloader):
+            xs, ys = batch
+            xs = xs.to(self.device)
+            ys = ys.to(self.device)
 
             if phase == "train":
                 outputs = self.model(xs)
-                outputs.update({"x": xs, "y": ys, "target": aux})
-                loss = self.loss(**outputs)
+                recon_x = outputs["recon"]
+                logits = outputs["mask"]
+                vector = outputs["vector"]
+                density = outputs["density"]
+
+                logits = logits.view(ys.shape)
+                loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
 
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                # if step % update_step == 0 or step == len(dataloader):
-                #     self.optimizer.step()
-                #     self.optimizer.zero_grad()
 
             else:
                 with torch.no_grad():
                     outputs = self.model(xs)
-                    outputs.update({"x": xs, "y": ys, "target": aux})
-                    loss = self.loss(**outputs)
+                    recon_x = outputs["recon"]
+                    logits = outputs["mask"]
+                    vector = outputs["vector"]
+                    density = outputs["density"]
+                    logits = logits.view(ys.shape)
+                    loss = self.loss(recon_x, xs, logits, ys.float(), vector, density)
 
             # metric
             loss_meter.update(loss.item(), len(ys))
 
-            images_confidences = torch.sigmoid(outputs["mask"]).view(ys.shape)
+            images_confidences = torch.sigmoid(logits)
             flat_confidence = images_confidences.flatten().detach().cpu().numpy()
             ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
 

@@ -270,6 +270,64 @@ class SupConDataset(Dataset):
         return views, torch.tensor([label], dtype=torch.float32)
 
 
+class ImageClassDataset(SupConDataset):
+    def __init__(
+        self,
+        images: List[np.ndarray],
+        masks: List[np.ndarray],
+        transform: A.Compose,
+        threshold=0.01,
+        device="cuda",
+        image_size=(386, 386),
+    ):
+        self.images = images
+        self.masks = masks
+        self.transform = transform
+        self.threshold = threshold
+        self.device = device
+        self.image_size = image_size
+        self._preaug()
+
+    def _preaug(self, n=32):
+        self.crop = A.RandomCrop(*self.image_size, p=1)
+
+        images = list()
+        masks = list()
+        for iter in tqdm.tqdm(range(n), desc="Pre-augmentation"):
+            for image, mask in zip(self.images, self.masks):
+                aug = self.crop(image=image, mask=mask)
+                images.append(aug["image"])
+                masks.append(aug["mask"])
+
+        self.images = images
+        self.masks = masks
+
+        return
+
+    def __len__(self):
+        return len(self.images)
+
+    def annotate_weakly_label(self, mask: np.ndarray) -> bool:
+        """Segmentation label -> Image level label"""
+        n_pixels: int = np.prod(mask.shape)
+        n_positive: int = np.sum(mask)
+        positive_ratio = n_positive / n_pixels
+        return positive_ratio >= self.threshold
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        """한 뷰에서는 동일한 라벨이어야함."""
+
+        image = self.images[idx]
+        mask = self.masks[idx]
+        aug1 = self.transform(image=image, mask=mask)
+        aug2 = self.transform(image=image, mask=mask)
+        views = torch.stack([aug1["image"], aug2["image"]], dim=0)
+
+        label = self.annotate_weakly_label(mask)
+
+        return views, torch.tensor([label], dtype=torch.float32)
+
+
 class StainDataset(Dataset):
     def __init__(
         self, images, masks, transform: A.Compose | None = None, device="cuda"
