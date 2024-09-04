@@ -167,6 +167,12 @@ class EncoderClassifier(torch.nn.Module):
 def train_pretrain(
     args,
     encoder,
+    train_images,
+    val_images,
+    train_masks,
+    val_masks,
+    test_images,
+    test_masks,
 ):
     # Train dataset
     dataset = ImageClassDataset
@@ -272,7 +278,16 @@ def train_pretrain(
     return
 
 
-def fine_tuning(args, model):
+def fine_tuning(
+    args,
+    model,
+    train_images,
+    val_images,
+    train_masks,
+    val_masks,
+    test_images,
+    test_masks,
+):
     # Loss
     dp_model = torch.nn.DataParallel(model)
     train_transform, test_transform = get_transforms(args.input_size)
