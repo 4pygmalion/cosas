@@ -338,6 +338,7 @@ if __name__ == "__main__":
                     epochs=args.epochs,
                     n_patience=args.n_patience,
                     update_step=args.update_step,
+                    save_plot=True,
                 )
                 mlflow.pytorch.log_model(model, "model")
 

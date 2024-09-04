@@ -190,6 +190,7 @@ class BinaryClassifierTrainer(ABC):
         epochs: int,
         n_patience: int,
         update_step: int = 1,
+        save_plot: bool = False,
     ):
 
         best_state_dict = deepcopy(self.model.state_dict())
@@ -227,10 +228,13 @@ class BinaryClassifierTrainer(ABC):
             dataloader=train_dataloader,
             epoch=epoch,
             phase="train_save",
-            save_plot=False,
+            save_plot=save_plot,
         )
         self.run_epoch(
-            dataloader=val_dataloader, epoch=epoch, phase="val_save", save_plot=False
+            dataloader=val_dataloader,
+            epoch=epoch,
+            phase="val_save",
+            save_plot=save_plot,
         )
 
         return train_loss, train_metrics, val_loss, val_metrics
