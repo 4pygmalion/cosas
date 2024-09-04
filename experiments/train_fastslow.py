@@ -313,7 +313,7 @@ if __name__ == "__main__":
             )
             val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
             test_dataset = dataset(
-                test_images, test_masks, test_transform, device=args.device, test=True
+                test_images, test_masks, test_transform, device=args.device
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
             loss = ReconMCCLoss(alpha=args.alpha)
