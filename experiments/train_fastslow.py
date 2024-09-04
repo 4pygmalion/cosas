@@ -44,7 +44,15 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser.add_argument("--run_name", type=str, default="baseline", help="Run name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs")
+    parser.add_argument(
+        "--epochs", type=int, default=200, help="Number of epochs (tuning)"
+    )
+    parser.add_argument(
+        "--pretaining_epochs",
+        type=int,
+        default=10,
+        help="Number of epochs (pretraining)",
+    )
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     parser.add_argument("--update_step", type=int, default=1, help="Update step")
