@@ -164,7 +164,10 @@ class EncoderClassifier(torch.nn.Module):
         return self.classifier(z)
 
 
-def train_pretrain(args, encoder):
+def train_pretrain(
+    args,
+    encoder,
+):
     # Train dataset
     dataset = ImageClassDataset
     train_transform, test_transform = get_transforms(args.input_size)
@@ -380,8 +383,26 @@ if __name__ == "__main__":
             model = model.to(args.device)
             encoder = EncoderClassifier(model.encoder).to(args.device)
 
-            train_pretrain(args, encoder)
-            test_metrics = fine_tuning(args, model)
+            train_pretrain(
+                args,
+                encoder,
+                train_images,
+                val_images,
+                train_masks,
+                val_masks,
+                test_images,
+                test_masks,
+            )
+            test_metrics = fine_tuning(
+                args,
+                model,
+                train_images,
+                val_images,
+                train_masks,
+                val_masks,
+                test_images,
+                test_masks,
+            )
             summary_metrics.append(test_metrics.to_dict(prefix="test_"))
 
         mlflow.log_metrics(summarize_metrics(summary_metrics))
