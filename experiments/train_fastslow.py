@@ -258,7 +258,7 @@ if __name__ == "__main__":
                     return self.classifier(z)
 
             model = model.to(args.device)
-            encoder = EncoderClassifier(model.encoder)
+            encoder = EncoderClassifier(model.encoder).to(args.device)
             dp_encoder_model = torch.nn.DataParallel(encoder)
 
             # Loss
