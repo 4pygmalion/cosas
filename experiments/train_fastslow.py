@@ -139,6 +139,147 @@ def get_transforms(
     return A.Compose(train_transform), A.Compose(test_transform)
 
 
+class EncoderClassifier(torch.nn.Module):
+    def __init__(self, encoder):
+        super().__init__()
+        self.encoder = encoder
+        self.classifier = torch.nn.Sequential(
+            torch.nn.Conv2d(640, 2560, kernel_size=(1, 1), stride=(1, 1), bias=False),
+            torch.nn.BatchNorm2d(
+                2560,
+                eps=0.001,
+                momentum=0.01,
+                affine=True,
+                track_running_stats=True,
+            ),
+            torch.nn.SiLU(inplace=True),
+            torch.nn.AdaptiveAvgPool2d(output_size=1),
+            torch.nn.Flatten(),
+            torch.nn.Linear(in_features=2560, out_features=1, bias=True),
+        )
+
+    def forward(self, x):
+        z = self.encoder(x)[-1]
+        return self.classifier(z)
+
+
+def train_pretrain(args, encoder):
+    dataset = ImageClassDataset
+    train_dataset = dataset(
+        train_images, train_masks, train_transform, device=args.device
+    )
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=True
+    )
+
+    # VAL, TEST Dataset
+    val_dataset = dataset(val_images, val_masks, test_transform, device=args.device)
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
+    test_dataset = dataset(
+        test_images, test_masks, test_transform, device=args.device, test=True
+    )
+    test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
+
+    dp_encoder_model = torch.nn.DataParallel(encoder)
+
+    # Loss
+    loss = torch.nn.BCEWithLogitsLoss()
+    trainer = BinaryClassifierTrainer(
+        model=dp_encoder_model,
+        loss=loss,
+        optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+        device=args.device,
+    )
+
+    with mlflow.start_run(
+        experiment_id=experiment.experiment_id,
+        run_name=args.run_name + f"_fold{fold}_pretrain",
+        nested=True,
+    ):
+        mlflow.log_params(args.__dict__)
+        mlflow.log_artifact(os.path.abspath(__file__))
+        mlflow.log_artifact(os.path.join(ROOT_DIR, "cosas", "networks.py"))
+
+        trainer.train(
+            train_dataloader,
+            val_dataloader,
+            epochs=args.pretaining_epochs,
+            n_patience=args.n_patience,
+            update_step=args.update_step,
+        )
+        mlflow.pytorch.log_model(model, "model")
+
+        test_loss, test_metrics = trainer.run_epoch(
+            test_dataloder,
+            phase="test",
+            epoch=0,
+            threshold=0.5,
+            save_plot=False,
+        )
+        mlflow.log_metric("test_loss", test_loss.avg)
+        mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
+
+    return
+
+
+def fine_tuning(args, model):
+    # Loss
+    dp_model = torch.nn.DataParallel(model)
+    train_transform, test_transform = get_transforms(args.input_size)
+    dataset = ImageMaskDataset
+    train_dataset = dataset(
+        train_images, train_masks, train_transform, device=args.device
+    )
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=True
+    )
+
+    # VAL, TEST Dataset
+    val_dataset = dataset(val_images, val_masks, test_transform, device=args.device)
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
+    test_dataset = dataset(test_images, test_masks, test_transform, device=args.device)
+    test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
+
+    if args.loss.startswith("recon"):
+        loss = LOSS_REGISTRY[args.loss](alpha=args.alpha)
+    else:
+        loss = LOSS_REGISTRY[args.loss]()
+
+    trainer = AETrainer(
+        model=dp_model,
+        loss=loss,
+        optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+        device=args.device,
+    )
+    with mlflow.start_run(
+        experiment_id=experiment.experiment_id,
+        run_name=args.run_name + f"_fold{fold}_downstream",
+        nested=True,
+    ):
+        mlflow.log_params(args.__dict__)
+        mlflow.log_artifact(os.path.abspath(__file__))
+        mlflow.log_artifact(os.path.join(ROOT_DIR, "cosas", "networks.py"))
+
+        trainer.train(
+            train_dataloader,
+            val_dataloader,
+            epochs=args.epochs,
+            n_patience=args.n_patience,
+            update_step=args.update_step,
+            save_plot=True,
+        )
+        mlflow.pytorch.log_model(model, "model")
+
+        test_loss, test_metrics = trainer.run_epoch(
+            test_dataloder, phase="test", epoch=0, threshold=0.5, save_plot=True
+        )
+        mlflow.log_metric("test_loss", test_loss.avg)
+        mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
+        
+        return test_metrics
+        
+
+
 if __name__ == "__main__":
     args = get_config()
     set_seed(42)
@@ -216,23 +357,6 @@ if __name__ == "__main__":
                 aug_fn = AUG_REGISTRY[args.sa]
                 train_images, train_masks = aug_fn(train_images, train_masks)
 
-            train_dataset = dataset(
-                train_images, train_masks, train_transform, device=args.device
-            )
-            train_dataloader = DataLoader(
-                train_dataset, batch_size=args.batch_size, shuffle=True
-            )
-
-            # VAL, TEST Dataset
-            val_dataset = dataset(
-                val_images, val_masks, test_transform, device=args.device
-            )
-            val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
-            test_dataset = dataset(
-                test_images, test_masks, test_transform, device=args.device, test=True
-            )
-            test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
-
             # MODEL
             model = MultiTaskAE(
                 architecture="Unet",
@@ -240,124 +364,12 @@ if __name__ == "__main__":
                 input_size=(args.input_size, args.input_size),
             )
 
-            class EncoderClassifier(torch.nn.Module):
-                def __init__(self, encoder):
-                    super().__init__()
-                    self.encoder = encoder
-                    self.classifier = torch.nn.Sequential(
-                        torch.nn.Conv2d(
-                            640, 2560, kernel_size=(1, 1), stride=(1, 1), bias=False
-                        ),
-                        torch.nn.BatchNorm2d(
-                            2560,
-                            eps=0.001,
-                            momentum=0.01,
-                            affine=True,
-                            track_running_stats=True,
-                        ),
-                        torch.nn.SiLU(inplace=True),
-                        torch.nn.AdaptiveAvgPool2d(output_size=1),
-                        torch.nn.Flatten(),
-                        torch.nn.Linear(in_features=2560, out_features=1, bias=True),
-                    )
-
-                def forward(self, x):
-                    z = self.encoder(x)[-1]
-                    return self.classifier(z)
-
             model = model.to(args.device)
             encoder = EncoderClassifier(model.encoder).to(args.device)
-            dp_encoder_model = torch.nn.DataParallel(encoder)
 
-            # Loss
-            loss = torch.nn.BCEWithLogitsLoss()
-            trainer = BinaryClassifierTrainer(
-                model=dp_encoder_model,
-                loss=loss,
-                optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
-                device=args.device,
-            )
-
-            with mlflow.start_run(
-                experiment_id=experiment.experiment_id,
-                run_name=args.run_name + f"_fold{fold}_pretrain",
-                nested=True,
-            ):
-                mlflow.log_params(args.__dict__)
-                mlflow.log_artifact(os.path.abspath(__file__))
-                mlflow.log_artifact(os.path.join(ROOT_DIR, "cosas", "networks.py"))
-
-                trainer.train(
-                    train_dataloader,
-                    val_dataloader,
-                    epochs=args.pretaining_epochs,
-                    n_patience=args.n_patience,
-                    update_step=args.update_step,
-                )
-                mlflow.pytorch.log_model(model, "model")
-
-                test_loss, test_metrics = trainer.run_epoch(
-                    test_dataloder,
-                    phase="test",
-                    epoch=0,
-                    threshold=0.5,
-                    save_plot=False,
-                )
-                mlflow.log_metric("test_loss", test_loss.avg)
-                mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
-                summary_metrics.append(test_metrics.to_dict(prefix="test_"))
-
-            # Loss
-            dp_model = torch.nn.DataParallel(model)
-            train_transform, test_transform = get_transforms(args.input_size)
-            dataset = ImageMaskDataset
-            train_dataset = dataset(
-                train_images, train_masks, train_transform, device=args.device
-            )
-            train_dataloader = DataLoader(
-                train_dataset, batch_size=args.batch_size, shuffle=True
-            )
-
-            # VAL, TEST Dataset
-            val_dataset = dataset(
-                val_images, val_masks, test_transform, device=args.device
-            )
-            val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
-            test_dataset = dataset(
-                test_images, test_masks, test_transform, device=args.device
-            )
-            test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
-            loss = ReconMCCLoss(alpha=args.alpha)
-            trainer = AETrainer(
-                model=dp_model,
-                loss=loss,
-                optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
-                device=args.device,
-            )
-            with mlflow.start_run(
-                experiment_id=experiment.experiment_id,
-                run_name=args.run_name + f"_fold{fold}_downstream",
-                nested=True,
-            ):
-                mlflow.log_params(args.__dict__)
-                mlflow.log_artifact(os.path.abspath(__file__))
-                mlflow.log_artifact(os.path.join(ROOT_DIR, "cosas", "networks.py"))
-
-                trainer.train(
-                    train_dataloader,
-                    val_dataloader,
-                    epochs=args.epochs,
-                    n_patience=args.n_patience,
-                    update_step=args.update_step,
-                    save_plot=True,
-                )
-                mlflow.pytorch.log_model(model, "model")
-
-                test_loss, test_metrics = trainer.run_epoch(
-                    test_dataloder, phase="test", epoch=0, threshold=0.5, save_plot=True
-                )
-                mlflow.log_metric("test_loss", test_loss.avg)
-                mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
-                summary_metrics.append(test_metrics.to_dict(prefix="test_"))
-
+            train_pretrain(args, encoder)
+            test_metrics = fine_tuning(args, model)
+            
+            summary_metrics.append(test_metrics.to_dict(prefix="test_"))
+        summary_metrics = 
         mlflow.log_metrics(summarize_metrics(summary_metrics))

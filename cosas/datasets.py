@@ -1,5 +1,6 @@
 import random
 from typing import Tuple, List
+from copy import deepcopy
 
 import cv2
 import tqdm
@@ -282,8 +283,8 @@ class ImageClassDataset(SupConDataset):
         image_size=(386, 386),
         patch_size=(256, 256),
     ):
-        self.images = images.copy()
-        self.masks = masks.copy()
+        self.images = deepcopy(images)
+        self.masks = deepcopy(masks)
         self.labels = [
             np.array([0]) if mask.sum() == 0 else np.array([1]) for mask in self.masks
         ]
