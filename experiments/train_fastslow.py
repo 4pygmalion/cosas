@@ -92,12 +92,6 @@ def get_config() -> argparse.ArgumentParser:
     parser.add_argument("--use_sparisty_loss", action="store_true", default=False)
     parser.add_argument("--alpha", type=float, default=1.0)
     parser.add_argument(
-        "--use_sn",
-        action="store_true",
-        help="use stain noramlization(vahadane)",
-        default=False,
-    )
-    parser.add_argument(
         "--sa", choices=list(AUG_REGISTRY.keys()), help="Use stain augmentation"
     )
     parser.add_argument("--use_task1", action="store_true", default=False)
@@ -158,7 +152,6 @@ if __name__ == "__main__":
         mlflow.log_artifacts(os.path.join(ROOT_DIR, "cosas"), artifact_path="cosas")
         mlflow.log_artifact(os.path.abspath(__file__))
 
-        normalizer = SPCNNormalizer()
         for fold, (train_val_indices, test_indices) in enumerate(
             folds.split(cosas_data2.images, cosas_data2.domain_indices), start=1
         ):
@@ -175,12 +168,6 @@ if __name__ == "__main__":
                 random_state=args.seed,
                 stratify=train_val_domains,
             )
-            if args.use_sn:
-                median_image = find_median_lab_image(train_images)
-                normalizer.fit(median_image)
-                train_images = [normalizer.transform(image) for image in train_images]
-                val_images = [normalizer.transform(image) for image in val_images]
-                test_images = [normalizer.transform(image) for image in test_images]
 
             # Append COSAS Task1 data
             train_images += cosas_data1.images if args.use_task1 else list()
