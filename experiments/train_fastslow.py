@@ -1,5 +1,6 @@
 import os
 import argparse
+from copy import deepcopy
 
 import torchvision
 import mlflow
@@ -164,19 +165,65 @@ class EncoderClassifier(torch.nn.Module):
 
 
 def train_pretrain(args, encoder):
+    # Train dataset
+    dataset = ImageClassDataset
+    train_transform, test_transform = get_transforms(args.input_size)
+    if args.sa == "albu_randstainna":
+        randstainna_transform = RandStainNATransform()
+        randstainna_transform.fit(train_images)
+
+        train_transform, test_transform = get_transforms(
+            args.input_size,
+            randstainna_transform=randstainna_transform,
+            stain_separation_transform=None,
+        )
+    elif args.sa == "albu_stain_separation":
+        stain_separation_transform = StainSeparationTransform()
+        train_transform, test_transform = get_transforms(
+            args.input_size,
+            randstainna_transform=None,
+            stain_separation_transform=stain_separation_transform,
+        )
+    elif args.sa == "albu_mix":
+        randstainna_transform = RandStainNATransform()
+        randstainna_transform.fit(train_images)
+
+        stain_separation_transform = StainSeparationTransform()
+        train_transform, test_transform = get_transforms(
+            args.input_size,
+            randstainna_transform=randstainna_transform,
+            stain_separation_transform=stain_separation_transform,
+        )
+    elif args.sa:
+        aug_fn = AUG_REGISTRY[args.sa]
+        train_images, train_masks = aug_fn(train_images, train_masks)
+
     dataset = ImageClassDataset
     train_dataset = dataset(
-        train_images, train_masks, train_transform, device=args.device
+        deepcopy(train_images),
+        deepcopy(train_masks),
+        train_transform,
+        device=args.device,
     )
     train_dataloader = DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True
     )
 
     # VAL, TEST Dataset
-    val_dataset = dataset(val_images, val_masks, test_transform, device=args.device)
+    val_dataset = dataset(
+        deepcopy(val_images),
+        deepcopy(val_masks),
+        test_transform,
+        device=args.device,
+        test=True,
+    )
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
     test_dataset = dataset(
-        test_images, test_masks, test_transform, device=args.device, test=True
+        deepcopy(test_images),
+        deepcopy(test_masks),
+        test_transform,
+        device=args.device,
+        test=True,
     )
     test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
@@ -275,9 +322,8 @@ def fine_tuning(args, model):
         )
         mlflow.log_metric("test_loss", test_loss.avg)
         mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
-        
+
         return test_metrics
-        
 
 
 if __name__ == "__main__":
@@ -324,39 +370,6 @@ if __name__ == "__main__":
             train_images += cosas_data1.images if args.use_task1 else list()
             train_masks += cosas_data1.masks if args.use_task1 else list()
 
-            # Train dataset
-            dataset = ImageClassDataset
-            train_transform, test_transform = get_transforms(args.input_size)
-            if args.sa == "albu_randstainna":
-                randstainna_transform = RandStainNATransform()
-                randstainna_transform.fit(train_images)
-
-                train_transform, test_transform = get_transforms(
-                    args.input_size,
-                    randstainna_transform=randstainna_transform,
-                    stain_separation_transform=None,
-                )
-            elif args.sa == "albu_stain_separation":
-                stain_separation_transform = StainSeparationTransform()
-                train_transform, test_transform = get_transforms(
-                    args.input_size,
-                    randstainna_transform=None,
-                    stain_separation_transform=stain_separation_transform,
-                )
-            elif args.sa == "albu_mix":
-                randstainna_transform = RandStainNATransform()
-                randstainna_transform.fit(train_images)
-
-                stain_separation_transform = StainSeparationTransform()
-                train_transform, test_transform = get_transforms(
-                    args.input_size,
-                    randstainna_transform=randstainna_transform,
-                    stain_separation_transform=stain_separation_transform,
-                )
-            elif args.sa:
-                aug_fn = AUG_REGISTRY[args.sa]
-                train_images, train_masks = aug_fn(train_images, train_masks)
-
             # MODEL
             model = MultiTaskAE(
                 architecture="Unet",
@@ -369,7 +382,6 @@ if __name__ == "__main__":
 
             train_pretrain(args, encoder)
             test_metrics = fine_tuning(args, model)
-            
             summary_metrics.append(test_metrics.to_dict(prefix="test_"))
-        summary_metrics = 
+
         mlflow.log_metrics(summarize_metrics(summary_metrics))
