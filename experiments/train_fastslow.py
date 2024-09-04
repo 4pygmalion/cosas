@@ -14,7 +14,7 @@ from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.networks import MultiTaskAE, MODEL_REGISTRY
 from cosas.data_model import COSASData
-from cosas.datasets import DATASET_REGISTRY, ImageClassDataset
+from cosas.datasets import DATASET_REGISTRY, ImageClassDataset, ImageMaskDataset
 from cosas.transforms import (
     CopyTransform,
     AUG_REGISTRY,
@@ -298,6 +298,24 @@ if __name__ == "__main__":
 
             # Loss
             dp_model = torch.nn.DataParallel(model)
+            train_transform, test_transform = get_transforms(args.input_size)
+            dataset = ImageMaskDataset
+            train_dataset = dataset(
+                train_images, train_masks, train_transform, device=args.device
+            )
+            train_dataloader = DataLoader(
+                train_dataset, batch_size=args.batch_size, shuffle=True
+            )
+
+            # VAL, TEST Dataset
+            val_dataset = dataset(
+                val_images, val_masks, test_transform, device=args.device
+            )
+            val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
+            test_dataset = dataset(
+                test_images, test_masks, test_transform, device=args.device, test=True
+            )
+            test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
             loss = ReconMCCLoss(alpha=args.alpha)
             trainer = AETrainer(
                 model=dp_model,
