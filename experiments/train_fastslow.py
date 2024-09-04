@@ -280,7 +280,7 @@ if __name__ == "__main__":
 
             with mlflow.start_run(
                 experiment_id=experiment.experiment_id,
-                run_name=args.run_name + f"_fold{fold}",
+                run_name=args.run_name + f"_fold{fold}_pretrain",
                 nested=True,
             ):
                 mlflow.log_params(args.__dict__)
@@ -295,6 +295,17 @@ if __name__ == "__main__":
                     update_step=args.update_step,
                 )
                 mlflow.pytorch.log_model(model, "model")
+
+                test_loss, test_metrics = trainer.run_epoch(
+                    test_dataloder,
+                    phase="test",
+                    epoch=0,
+                    threshold=0.5,
+                    save_plot=False,
+                )
+                mlflow.log_metric("test_loss", test_loss.avg)
+                mlflow.log_metrics(test_metrics.to_dict(prefix="test_"))
+                summary_metrics.append(test_metrics.to_dict(prefix="test_"))
 
             # Loss
             dp_model = torch.nn.DataParallel(model)
@@ -325,7 +336,7 @@ if __name__ == "__main__":
             )
             with mlflow.start_run(
                 experiment_id=experiment.experiment_id,
-                run_name=args.run_name + f"_fold{fold}",
+                run_name=args.run_name + f"_fold{fold}_downstream",
                 nested=True,
             ):
                 mlflow.log_params(args.__dict__)
