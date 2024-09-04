@@ -290,7 +290,7 @@ if __name__ == "__main__":
                 trainer.train(
                     train_dataloader,
                     val_dataloader,
-                    epochs=20,
+                    epochs=args.pretaining_epochs,
                     n_patience=args.n_patience,
                     update_step=args.update_step,
                 )
