@@ -1,6 +1,7 @@
 import os
 import argparse
 
+import torchvision
 import mlflow
 import torch
 import albumentations as A
@@ -8,11 +9,12 @@ from albumentations.pytorch.transforms import ToTensorV2
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
+
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.networks import MultiTaskAE, MODEL_REGISTRY
 from cosas.data_model import COSASData
-from cosas.datasets import DATASET_REGISTRY
+from cosas.datasets import DATASET_REGISTRY, ImageClassDataset
 from cosas.transforms import (
     CopyTransform,
     AUG_REGISTRY,
@@ -20,9 +22,9 @@ from cosas.transforms import (
     StainSeparationTransform,
     AUG_REGISTRY,
 )
-from cosas.losses import LOSS_REGISTRY
+from cosas.losses import LOSS_REGISTRY, ReconMCCLoss
 from cosas.misc import set_seed, get_config
-from cosas.trainer import AETrainer
+from cosas.trainer import AETrainer, BinaryClassifierTrainer
 from cosas.tracking import TRACKING_URI, get_experiment
 from cosas.metrics import summarize_metrics
 from cosas.normalization import find_median_lab_image, SPCNNormalizer
@@ -174,7 +176,7 @@ if __name__ == "__main__":
             train_masks += cosas_data1.masks if args.use_task1 else list()
 
             # Train dataset
-            dataset = DATASET_REGISTRY[args.dataset]
+            dataset = ImageClassDataset
             train_transform, test_transform = get_transforms(args.input_size)
             if args.sa == "albu_randstainna":
                 randstainna_transform = RandStainNATransform()
@@ -219,35 +221,82 @@ if __name__ == "__main__":
             )
             val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
             test_dataset = dataset(
-                test_images,
-                test_masks,
-                test_transform,
-                device=args.device,
+                test_images, test_masks, test_transform, device=args.device, test=True
             )
             test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
             # MODEL
-            if args.model_name in ("autoencoder", "imagelevel_multitask"):
-                model = MODEL_REGISTRY[args.model_name](
-                    architecture=args.architecture,
-                    encoder_name=args.encoder_name,
-                    input_size=(args.input_size, args.input_size),
-                )
-            else:
-                model = MODEL_REGISTRY[args.model_name]()
+            model = MultiTaskAE(
+                architecture="Unet",
+                encoder_name="efficientnet-b7",
+                input_size=(args.input_size, args.input_size),
+            )
+
+            class EncoderClassifier(torch.nn.Module):
+                def __init__(self, encoder):
+                    super().__init__()
+                    self.encoder = encoder
+                    self.classifier = torch.nn.Sequential(
+                        torch.nn.Conv2d(
+                            640, 2560, kernel_size=(1, 1), stride=(1, 1), bias=False
+                        ),
+                        torch.nn.BatchNorm2d(
+                            2560,
+                            eps=0.001,
+                            momentum=0.01,
+                            affine=True,
+                            track_running_stats=True,
+                        ),
+                        torch.nn.SiLU(inplace=True),
+                        torch.nn.AdaptiveAvgPool2d(output_size=1),
+                        torch.nn.Flatten(),
+                        torch.nn.Linear(in_features=2560, out_features=1, bias=True),
+                    )
+
+                def forward(self, x):
+                    z = self.encoder(x)[-1]
+                    return self.classifier(z)
 
             model = model.to(args.device)
-            dp_model = torch.nn.DataParallel(model)
+            encoder = EncoderClassifier(model.encoder)
+            dp_encoder_model = torch.nn.DataParallel(encoder)
 
             # Loss
-            loss = LOSS_REGISTRY[args.loss](alpha=args.alpha)
+            loss = torch.nn.BCEWithLogitsLoss()
+            trainer = BinaryClassifierTrainer(
+                model=dp_encoder_model,
+                loss=loss,
+                optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+                device=args.device,
+            )
+
+            with mlflow.start_run(
+                experiment_id=experiment.experiment_id,
+                run_name=args.run_name + f"_fold{fold}",
+                nested=True,
+            ):
+                mlflow.log_params(args.__dict__)
+                mlflow.log_artifact(os.path.abspath(__file__))
+                mlflow.log_artifact(os.path.join(ROOT_DIR, "cosas", "networks.py"))
+
+                trainer.train(
+                    train_dataloader,
+                    val_dataloader,
+                    epochs=20,
+                    n_patience=args.n_patience,
+                    update_step=args.update_step,
+                )
+                mlflow.pytorch.log_model(model, "model")
+
+            # Loss
+            dp_model = torch.nn.DataParallel(model)
+            loss = ReconMCCLoss(alpha=args.alpha)
             trainer = AETrainer(
                 model=dp_model,
                 loss=loss,
                 optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
                 device=args.device,
             )
-
             with mlflow.start_run(
                 experiment_id=experiment.experiment_id,
                 run_name=args.run_name + f"_fold{fold}",
