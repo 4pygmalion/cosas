@@ -285,6 +285,7 @@ if __name__ == "__main__":
                     epochs=20,
                     n_patience=args.n_patience,
                     update_step=args.update_step,
+                    save_plot=False,
                 )
                 mlflow.pytorch.log_model(model, "model")
 
