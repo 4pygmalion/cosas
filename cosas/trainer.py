@@ -518,6 +518,7 @@ class MultiTaskBinaryClassifierTrainer(BinaryClassifierTrainer):
         phase: Literal["train", "val", "test"],
         threshold: float = 0.5,
         save_plot: bool = False,
+        **kwargs,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.
