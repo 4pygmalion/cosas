@@ -138,10 +138,10 @@ class BinaryClassifierTrainer(ABC):
                 logits = self.model(xs)
                 logits = logits.view(ys.shape)
                 loss = self.loss(logits, ys.float())
+
+                self.optimizer.zero_grad()
                 loss.backward()
-                if step % update_step == 0 or step == len(dataloader):
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
+                self.optimizer.step()
 
             else:
                 with torch.no_grad():
@@ -224,10 +224,13 @@ class BinaryClassifierTrainer(ABC):
 
         self.model.load_state_dict(best_state_dict)
         self.run_epoch(
-            dataloader=train_dataloader, epoch=epoch, phase="train_save", save_plot=True
+            dataloader=train_dataloader,
+            epoch=epoch,
+            phase="train_save",
+            save_plot=False,
         )
         self.run_epoch(
-            dataloader=val_dataloader, epoch=epoch, phase="val_save", save_plot=True
+            dataloader=val_dataloader, epoch=epoch, phase="val_save", save_plot=False
         )
 
         return train_loss, train_metrics, val_loss, val_metrics
