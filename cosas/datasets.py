@@ -281,7 +281,7 @@ class ImageClassDataset(SupConDataset):
         threshold=0.01,
         device="cuda",
         image_size=(386, 386),
-        patch_size=(256, 256),
+        patch_sizes=[(256, 256), (386, 386), (512, 512), (768, 768)],
     ):
         self.images = deepcopy(images)
         self.masks = deepcopy(masks)
@@ -293,7 +293,7 @@ class ImageClassDataset(SupConDataset):
         self.threshold = threshold
         self.device = device
         self.image_size = image_size
-        self.patch_size = patch_size
+        self.patch_sizes = patch_sizes
         if not test:
             self._preaug()
 
@@ -311,32 +311,42 @@ class ImageClassDataset(SupConDataset):
 
     def collate_positive_mask(self):
         self.positive_patchs = list()
-        crop = A.RandomCrop(*self.patch_size, p=1)
+
+        patch_size = random.sample(self.patch_sizes, k=1)[0]
+        crop = A.RandomCrop(*patch_size, p=1)
 
         for image, mask in zip(self.images, self.masks):
             aug = crop(image=image, mask=mask)
-            if aug["mask"].sum() > 1:
+            mask_ratio = aug["mask"].sum() / np.prod(aug["mask"].shape)
+            if mask_ratio > 0.05:
                 self.positive_patchs.append(aug["image"])
 
         return
 
-    def _cutpaste(self, image, mask):
+    def _paste(self, image, positive_patch) -> np.ndarray:
         new_image = image.copy()
-        if random.uniform(0, 1) > 0.5:
+        h, w, _ = image.shape
+
+        pos_h, pos_w = positive_patch.shape[:2]
+        start_x = np.random.randint(0, h - pos_h)
+        start_y = np.random.randint(0, w - pos_w)
+        new_image[start_x : start_x + pos_h, start_y : start_y + pos_w, :] = (
+            positive_patch
+        )
+
+        return new_image
+
+    def _cutpaste(self, image, mask):
+        positive_patch = random.sample(self.positive_patchs, 1)[0]
+        if mask.sum() == 0:
+            new_image = self._paste(image, positive_patch)
+            return new_image, np.array([1])
+
+        else:
             new_image, new_label = self._maskout(image, mask)
+            new_image = self._paste(new_image, positive_patch)
 
-            # Negative 이미지 내의 랜덤 좌표 생성
-            h, w, _ = image.shape
-
-            positive_patch = random.sample(self.positive_patchs, 1)[0]
-            pos_h, pos_w = positive_patch.shape[:2]
-            start_x = np.random.randint(0, h - pos_h)
-            start_y = np.random.randint(0, w - pos_w)
-            new_image[start_x : start_x + pos_h, start_y : start_y + pos_w, :] = (
-                positive_patch
-            )
-
-        return new_image, np.array([1])
+            return new_image, np.array([1])
 
     def _preaug(self, multiple=3):
         self.collate_positive_mask()
