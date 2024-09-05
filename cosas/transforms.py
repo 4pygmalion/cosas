@@ -1,6 +1,6 @@
 import random
 import math
-from typing import Tuple, List, Dict, Any, Optional
+from typing import Tuple, List, Dict, Any, Optional, Callable
 
 import cv2
 import numpy as np
@@ -713,6 +713,26 @@ def discard_minor_prediction(pred_mask: np.ndarray, ratio=0.05):
     return pred_mask
 
 
+def mophologic_transformation(pred_mask: np.ndarray):
+    x = cv2.dilate(pred_mask, cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15)))
+    x = cv2.morphologyEx(
+        x,
+        cv2.MORPH_CLOSE,
+        cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15)),
+    )
+    return cv2.morphologyEx(x, cv2.MORPH_OPEN, np.ones((17, 17), np.uint8))
+
+
+class PostProcessPipe:
+    def __init__(self, postprocesses: List[Callable]):
+        self.postprocesses = postprocesses
+
+    def __call__(self, pred_mask: np.ndarray):
+        for postprocess in self.postprocesses:
+            pred_mask = postprocess(pred_mask)
+        return pred_mask
+
+
 AUG_REGISTRY = {
     "albu_randstainna": "RandStainNATransform",
     "albu_stain_separation": "StainSeparationTransform",
@@ -724,4 +744,5 @@ AUG_REGISTRY = {
 
 POSTPROCESS_REGISTRY = {
     "discard_minor": discard_minor_prediction,
+    "mophologic_transformation": mophologic_transformation,
 }

@@ -27,7 +27,7 @@ from cosas.datasets import ImageMaskDataset
 from cosas.metrics import summarize_metrics
 from cosas.misc import rotational_tta, rotational_tta_dict
 from cosas.normalization import SPCNNormalizer
-from cosas.transforms import POSTPROCESS_REGISTRY
+from cosas.transforms import POSTPROCESS_REGISTRY, PostProcessPipe
 from cosas.tracking import log_patch_and_save_by_batch
 
 
@@ -145,6 +145,7 @@ def get_args():
         choices=list(POSTPROCESS_REGISTRY.keys()),
         default=None,
         help="Use postprocessing",
+        nargs="+",
     )
     parser.add_argument(
         "--model_return_dict",
@@ -302,7 +303,12 @@ def main():
                 tta_fn = rotational_tta
 
             if args.postprocess:
-                postprocess = POSTPROCESS_REGISTRY[args.postprocess]
+                pipe = list()
+                for method_key in args.postprocess:
+                    postprocess: callable = POSTPROCESS_REGISTRY[method_key]
+                    pipe.append(postprocess)
+                postprocess: callable = PostProcessPipe(pipe)
+
             else:
                 postprocess = None
 
