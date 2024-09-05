@@ -138,10 +138,10 @@ class BinaryClassifierTrainer(ABC):
                 logits = self.model(xs)
                 logits = logits.view(ys.shape)
                 loss = self.loss(logits, ys.float())
+
+                self.optimizer.zero_grad()
                 loss.backward()
-                if step % update_step == 0 or step == len(dataloader):
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
+                self.optimizer.step()
 
             else:
                 with torch.no_grad():
@@ -190,6 +190,7 @@ class BinaryClassifierTrainer(ABC):
         epochs: int,
         n_patience: int,
         update_step: int = 1,
+        save_plot: bool = False,
     ):
 
         best_state_dict = deepcopy(self.model.state_dict())
@@ -224,10 +225,16 @@ class BinaryClassifierTrainer(ABC):
 
         self.model.load_state_dict(best_state_dict)
         self.run_epoch(
-            dataloader=train_dataloader, epoch=epoch, phase="train_save", save_plot=True
+            dataloader=train_dataloader,
+            epoch=epoch,
+            phase="train_save",
+            save_plot=save_plot,
         )
         self.run_epoch(
-            dataloader=val_dataloader, epoch=epoch, phase="val_save", save_plot=True
+            dataloader=val_dataloader,
+            epoch=epoch,
+            phase="val_save",
+            save_plot=save_plot,
         )
 
         return train_loss, train_metrics, val_loss, val_metrics
@@ -404,7 +411,7 @@ class AETrainer(BinaryClassifierTrainer):
         phase: Literal["train", "val", "test"],
         threshold: float = 0.5,
         save_plot: bool = False,
-        update_step: int = 1,
+        **kwargs,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.
@@ -433,35 +440,40 @@ class AETrainer(BinaryClassifierTrainer):
 
         epoch_metrics = Metrics()
         loss_meter = AverageMeter("loss")
-
-        for step, batch in enumerate(dataloader, start=1):
-            if len(batch) == 3:
-                xs, ys, aux = batch
-                xs, ys, aux = map(lambda x: x.to(self.device), [xs, ys, aux])
-            elif len(batch) == 2:
-                xs, ys = batch
-                aux = None
-                xs, ys = map(lambda x: x.to(self.device), [xs, ys])
+        i = 0
+        for step, batch in enumerate(dataloader):
+            xs, ys = batch
+            xs = xs.to(self.device)
+            ys = ys.to(self.device)
 
             if phase == "train":
                 outputs = self.model(xs)
-                outputs.update({"x": xs, "y": ys, "target": aux})
-                loss = self.loss(**outputs)
+                recon_x = outputs["recon"]
+                logits = outputs["mask"]
+                vector = outputs["vector"]
+                density = outputs["density"]
+
+                logits = logits.view(ys.shape)
+                loss = self.loss(recon_x, xs, logits, ys.float())
+
+                self.optimizer.zero_grad()
                 loss.backward()
-                if step % update_step == 0 or step == len(dataloader):
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
+                self.optimizer.step()
 
             else:
                 with torch.no_grad():
                     outputs = self.model(xs)
-                    outputs.update({"x": xs, "y": ys, "target": aux})
-                    loss = self.loss(**outputs)
+                    recon_x = outputs["recon"]
+                    logits = outputs["mask"]
+                    vector = outputs["vector"]
+                    density = outputs["density"]
+                    logits = logits.view(ys.shape)
+                    loss = self.loss(recon_x, xs, logits, ys.float())
 
             # metric
             loss_meter.update(loss.item(), len(ys))
 
-            images_confidences = torch.sigmoid(outputs["mask"]).view(ys.shape)
+            images_confidences = torch.sigmoid(logits)
             flat_confidence = images_confidences.flatten().detach().cpu().numpy()
             ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
 
@@ -514,6 +526,7 @@ class MultiTaskBinaryClassifierTrainer(BinaryClassifierTrainer):
         phase: Literal["train", "val", "test"],
         threshold: float = 0.5,
         save_plot: bool = False,
+        **kwargs,
     ) -> Tuple[AverageMeter, Metrics]:
         """1회 Epoch을 각 페이즈(train, validation)에 따라서 학습하거나 손실값을
         반환함.

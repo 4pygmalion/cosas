@@ -1,5 +1,6 @@
 import random
 from typing import Tuple, List
+from copy import deepcopy
 
 import cv2
 import tqdm
@@ -270,6 +271,123 @@ class SupConDataset(Dataset):
         return views, torch.tensor([label], dtype=torch.float32)
 
 
+class ImageClassDataset(SupConDataset):
+    def __init__(
+        self,
+        images: List[np.ndarray],
+        masks: List[np.ndarray],
+        transform: A.Compose = None,
+        test: bool = False,
+        threshold=0.01,
+        device="cuda",
+        image_size=(386, 386),
+        patch_sizes=[(256, 256), (386, 386), (512, 512), (768, 768)],
+    ):
+        self.images = deepcopy(images)
+        self.masks = deepcopy(masks)
+        self.labels = [
+            np.array([0]) if mask.sum() == 0 else np.array([1]) for mask in self.masks
+        ]
+        self.transform = transform
+        self.test = test
+        self.threshold = threshold
+        self.device = device
+        self.image_size = image_size
+        self.patch_sizes = patch_sizes
+        if not test:
+            self._preaug()
+
+    def _maskout(self, image, mask):
+        if mask.sum() == 0:
+            return image, np.array([0])
+
+        if mask.sum() == np.sum(mask.shape):
+            return image, np.array([1])
+
+        new_image = image.copy()
+        new_image[np.where(mask == 1)] = 255
+
+        return new_image, np.array([0])
+
+    def collate_positive_mask(self):
+        self.positive_patchs = list()
+
+        patch_size = random.sample(self.patch_sizes, k=1)[0]
+        crop = A.RandomCrop(*patch_size, p=1)
+
+        for image, mask in zip(self.images, self.masks):
+            aug = crop(image=image, mask=mask)
+            mask_ratio = aug["mask"].sum() / np.prod(aug["mask"].shape)
+            if mask_ratio > 0.05:
+                self.positive_patchs.append(aug["image"])
+
+        return
+
+    def _paste(self, image, positive_patch) -> np.ndarray:
+        new_image = image.copy()
+        h, w, _ = image.shape
+
+        pos_h, pos_w = positive_patch.shape[:2]
+        start_x = np.random.randint(0, h - pos_h)
+        start_y = np.random.randint(0, w - pos_w)
+        new_image[start_x : start_x + pos_h, start_y : start_y + pos_w, :] = (
+            positive_patch
+        )
+
+        return new_image
+
+    def _cutpaste(self, image, mask):
+        positive_patch = random.sample(self.positive_patchs, 1)[0]
+        if mask.sum() == 0:
+            new_image = self._paste(image, positive_patch)
+            return new_image, np.array([1])
+
+        else:
+            new_image, new_label = self._maskout(image, mask)
+            new_image = self._paste(new_image, positive_patch)
+
+            return new_image, np.array([1])
+
+    def _preaug(self, multiple=3):
+        self.collate_positive_mask()
+
+        new_images = list()
+        new_labels = list()
+        self.labels = [
+            np.array([0]) if mask.sum() == 0 else np.array([1]) for mask in self.masks
+        ]
+        for _ in tqdm.tqdm(range(multiple), desc="Pre-augmentation"):
+            for image, mask in zip(self.images, self.masks):
+                if random.uniform(0, 1) > 0.5:
+                    new_image, new_label = self._cutpaste(image, mask)
+                    new_images.append(new_image)
+                    new_labels.append(new_label)
+
+                else:
+                    new_image, new_label = self._maskout(image, mask)
+                    new_images.append(new_image)
+                    new_labels.append(new_label)
+
+        self.images += new_images
+        self.labels += new_labels
+
+        return
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        """한 뷰에서는 동일한 라벨이어야함."""
+
+        image = self.images[idx]
+        label = self.labels[idx]
+        if self.transform:
+            aug = self.transform(image=image)
+            image = aug["image"]
+
+        return image, torch.from_numpy(label).float()
+
+
 class StainDataset(Dataset):
     def __init__(
         self, images, masks, transform: A.Compose | None = None, device="cuda"
@@ -351,6 +469,7 @@ class ImageMaskAuxillaryLabelDataset(Dataset):
 DATASET_REGISTRY = {
     "patch": Patchdataset,
     "whole": WholeSizeDataset,
+    "image_cls": ImageClassDataset,
     "image_mask": ImageMaskDataset,
     "multiscale": MultiScaleDataset,
     "supercon": SupConDataset,
