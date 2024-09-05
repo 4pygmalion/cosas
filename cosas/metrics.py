@@ -135,6 +135,7 @@ def calculate_metrics(
     threshold=0.5,
     postprocess: callable = None,
 ) -> Dict[str, float]:
+
     breakpoint()
     pred_label = (confidences >= threshold).astype(np.uint8)
     if postprocess:
