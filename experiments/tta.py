@@ -112,7 +112,9 @@ class Evaluator(BinaryClassifierTrainer):
             )
 
             if save_plot:
-                log_patch_and_save_by_batch(xs, ys, images_confidences, phase=phase)
+                log_patch_and_save_by_batch(
+                    xs, ys, images_confidences, phase=phase, postprocess=postprocess
+                )
 
             bar.suffix = self.make_bar_sentence(
                 phase=phase,

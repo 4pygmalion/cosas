@@ -136,6 +136,8 @@ def calculate_metrics(
     postprocess: callable = None,
 ) -> Dict[str, float]:
 
+    targets = targets.ravel()
+
     pred_label = (confidences >= threshold).astype(np.uint8)
     if postprocess:
         pred_label = postprocess(pred_label).astype(np.uint8)
