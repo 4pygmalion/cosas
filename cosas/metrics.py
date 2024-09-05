@@ -140,8 +140,9 @@ def calculate_metrics(
     if postprocess:
         pred_label = postprocess(pred_label).astype(np.uint8)
 
+    confidences = confidences.ravel()
     pred_label = pred_label.ravel()
-    breakpoint()
+
     f1 = f1_score(targets, pred_label)
     acc = accuracy_score(targets, pred_label)
 
