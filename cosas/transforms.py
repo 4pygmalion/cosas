@@ -727,10 +727,21 @@ class PostProcessPipe:
     def __init__(self, postprocesses: List[Callable]):
         self.postprocesses = postprocesses
 
-    def __call__(self, pred_mask: np.ndarray):
+    def __call__(self, pred_masks: np.ndarray):
+        res = list()
+        if pred_masks.ndim == 3:  # (N, H, W)
+            for pred_mask in pred_masks:
+                for postprocess in self.postprocesses:
+                    pred_mask = postprocess(pred_mask)
+
+                res.append(pred_mask)
+
+            return np.stack(res, axis=0)
+
         for postprocess in self.postprocesses:
-            pred_mask = postprocess(pred_mask)
-        return pred_mask
+            pred_masks = postprocess(pred_masks)
+
+        return pred_masks
 
 
 AUG_REGISTRY = {
