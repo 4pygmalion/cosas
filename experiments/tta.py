@@ -99,12 +99,12 @@ class Evaluator(BinaryClassifierTrainer):
             logits = logits.view(ys.shape)
 
             images_confidences = torch.sigmoid(logits)
-            flat_confidence = images_confidences.flatten().detach().cpu().numpy()
+            confidences = images_confidences.detach().cpu().numpy()
             ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
 
             epoch_metrics.update(
                 calculate_metrics(
-                    flat_confidence,
+                    confidences,
                     ground_truths,
                     threshold=threshold,
                     postprocess=postprocess,
