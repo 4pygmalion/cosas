@@ -714,13 +714,13 @@ def discard_minor_prediction(pred_mask: np.ndarray, ratio=0.05):
 
 
 def mophologic_transformation(pred_mask: np.ndarray):
-    x = cv2.dilate(pred_mask, cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15)))
+    x = cv2.dilate(pred_mask, cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5)))
     x = cv2.morphologyEx(
         x,
         cv2.MORPH_CLOSE,
-        cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15)),
+        cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5)),
     )
-    return cv2.morphologyEx(x, cv2.MORPH_OPEN, np.ones((17, 17), np.uint8))
+    return cv2.morphologyEx(x, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
 
 
 class PostProcessPipe:
