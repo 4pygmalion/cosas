@@ -107,16 +107,23 @@ def log_patch_and_save_by_batch(
     batch_ys: torch.Tensor,
     batch_confidences: torch.Tensor,
     phase: str,
+    postprocess: callable = None,
     threshold=0.5,
 ) -> None:
 
     for i, (x, y, confidence) in enumerate(zip(batch_xs, batch_ys, batch_confidences)):
         image_confidence = confidence.detach().cpu().numpy()
         image_label = y.detach().cpu().numpy()
+
+        pred_label = (image_confidence >= 0.5).astype(np.uint8)
+        if postprocess is not None:
+            pred_label = postprocess(pred_label).astype(np.uint8)
+
         instance_metrics = calculate_metrics(
-            image_confidence.ravel(),
-            image_label.ravel(),
+            image_confidence,
+            image_label,
             threshold=threshold,
+            postprocess=postprocess,
         )
         dice = round(instance_metrics["dice"], 4)
         iou = round(instance_metrics["iou"], 4)
@@ -127,7 +134,7 @@ def log_patch_and_save_by_batch(
             image_name=f"step_{i}_dice_{dice}_iou_{iou}",
             original_x=original_x,
             original_y=image_label,
-            pred_masks=image_confidence >= 0.5,
+            pred_masks=pred_label,
             artifact_dir=f"{phase}_prediction",
         )
 

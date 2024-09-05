@@ -27,7 +27,7 @@ from cosas.datasets import ImageMaskDataset
 from cosas.metrics import summarize_metrics
 from cosas.misc import rotational_tta, rotational_tta_dict
 from cosas.normalization import SPCNNormalizer
-from cosas.transforms import POSTPROCESS_REGISTRY
+from cosas.transforms import POSTPROCESS_REGISTRY, PostProcessPipe
 from cosas.tracking import log_patch_and_save_by_batch
 
 
@@ -99,12 +99,12 @@ class Evaluator(BinaryClassifierTrainer):
             logits = logits.view(ys.shape)
 
             images_confidences = torch.sigmoid(logits)
-            flat_confidence = images_confidences.flatten().detach().cpu().numpy()
+            confidences = images_confidences.detach().cpu().numpy()
             ground_truths: torch.Tensor = ys.flatten().detach().cpu().numpy()
 
             epoch_metrics.update(
                 calculate_metrics(
-                    flat_confidence,
+                    confidences,
                     ground_truths,
                     threshold=threshold,
                     postprocess=postprocess,
@@ -112,7 +112,9 @@ class Evaluator(BinaryClassifierTrainer):
             )
 
             if save_plot:
-                log_patch_and_save_by_batch(xs, ys, images_confidences, phase=phase)
+                log_patch_and_save_by_batch(
+                    xs, ys, images_confidences, phase=phase, postprocess=postprocess
+                )
 
             bar.suffix = self.make_bar_sentence(
                 phase=phase,
@@ -145,6 +147,7 @@ def get_args():
         choices=list(POSTPROCESS_REGISTRY.keys()),
         default=None,
         help="Use postprocessing",
+        nargs="+",
     )
     parser.add_argument(
         "--model_return_dict",
@@ -302,7 +305,12 @@ def main():
                 tta_fn = rotational_tta
 
             if args.postprocess:
-                postprocess = POSTPROCESS_REGISTRY[args.postprocess]
+                pipe = list()
+                for method_key in args.postprocess:
+                    postprocess: callable = POSTPROCESS_REGISTRY[method_key]
+                    pipe.append(postprocess)
+                postprocess: callable = PostProcessPipe(pipe)
+
             else:
                 postprocess = None
 
