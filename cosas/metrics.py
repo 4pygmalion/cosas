@@ -136,10 +136,11 @@ def calculate_metrics(
     postprocess: callable = None,
 ) -> Dict[str, float]:
 
-    breakpoint()
     pred_label = (confidences >= threshold).astype(np.uint8)
     if postprocess:
         pred_label = postprocess(pred_label).astype(np.uint8)
+
+    pred_label = pred_label.ravel()
 
     f1 = f1_score(targets, pred_label)
     acc = accuracy_score(targets, pred_label)
