@@ -440,16 +440,17 @@ class MultiTaskAE(torch.nn.Module):
         self.architecture = getattr(smp, architecture)(
             encoder_name=self.encoder_name, classes=6
         )
+        self.encoder = self.architecture.encoder
 
+        self.stain_vec_decoder = self.architecture.decoder
         self.stain_vec_head = self.architecture.segmentation_head
 
-        self.encoder = self.architecture.encoder
-        self.stain_den = UnetDecoder(
+        self.stain_den_decoder = UnetDecoder(
             encoder_channels=self.encoder.out_channels,
-            decoder_channels=(256, 128, 64, 32, 2),
+            decoder_channels=(256, 128, 64, 32, 16),
         )
         self.stain_den_head = SegmentationHead(
-            in_channels=2, out_channels=2, activation=None
+            in_channels=16, out_channels=2, activation=None
         )
         self.mask_head = SegmentationHead(
             in_channels=8, out_channels=1, activation=None
@@ -459,12 +460,12 @@ class MultiTaskAE(torch.nn.Module):
         z = self.architecture.encoder(x)
 
         # Stain vectors (B, 2, 3, W, H)
-        x = self.architecture.decoder(*z)  # (6, W, H)
+        x = self.stain_vec_decoder(*z)  # (6, W, H)
         x = self.stain_vec_head(x)  # (B, 6, W, H)
         stain_vectors = x.view(-1, 2, 3, *self.input_size)  # (B, 2, 3, W, H)
 
         # Stain Density (B, 2, W, H)
-        x_d = self.stain_den(*z)  # (B, 2, W, H)
+        x_d = self.stain_den_decoder(*z)  # (B, 2, W, H)
         stain_density = self.stain_den_head(x_d)
 
         recon = torch.einsum("bscwh,bswh->bcwh", stain_vectors, stain_density)
