@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
-from cosas.networks import MultiTaskAE, MODEL_REGISTRY
+from cosas.networks import MultiTaskAE, MODEL_REGISTRY, Segformer
 from cosas.data_model import COSASData
 from cosas.datasets import DATASET_REGISTRY, ImageClassDataset, ImageMaskDataset
 from cosas.transforms import (
@@ -83,24 +83,6 @@ def get_config() -> argparse.ArgumentParser:
         required=False,
         choices=list(MODEL_REGISTRY.keys()),
     )
-    arch_choices = [
-        "Unet",
-        "UnetPlusPlus",
-        "MAnet",
-        "Linknet",
-        "FPN",
-        "PSPNet",
-        "DeepLabV3",
-        "DeepLabV3Plus",
-        "PAN",
-        "TransUNet",
-    ]
-    parser.add_argument(
-        "--architecture", type=str, required=False, choices=arch_choices
-    )
-    parser.add_argument("--encoder_name", type=str, required=False)
-
-    parser.add_argument("--use_sparisty_loss", action="store_true", default=False)
     parser.add_argument("--alpha", type=float, default=1.0)
     parser.add_argument(
         "--sa", choices=list(AUG_REGISTRY.keys()), help="Use stain augmentation"
@@ -162,6 +144,20 @@ class EncoderClassifier(torch.nn.Module):
     def forward(self, x):
         z = self.encoder(x)[-1]
         return self.classifier(z)
+
+
+class SegformerClassifier(torch.nn.Module):
+    def __init__(self, encoder):
+        super().__init__()
+        self.encoder = encoder
+        self.classifier = torch.nn.Linear(16 * 16, 1)
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        seq_out = self.encoder(x)[0]
+        gap_out = seq_out.reshape(batch_size, -1, 16 * 16).mean(dim=1)  # GAP
+
+        return self.classifier(gap_out)
 
 
 def train_pretrain(
@@ -280,7 +276,7 @@ def train_pretrain(
 
 def fine_tuning(
     args,
-    model,
+    trainer,
     train_images,
     val_images,
     train_masks,
@@ -289,7 +285,7 @@ def fine_tuning(
     test_masks,
 ):
     # Loss
-    dp_model = torch.nn.DataParallel(model)
+
     train_transform, test_transform = get_transforms(args.input_size)
     dataset = ImageMaskDataset
     train_dataset = dataset(
@@ -305,17 +301,6 @@ def fine_tuning(
     test_dataset = dataset(test_images, test_masks, test_transform, device=args.device)
     test_dataloder = DataLoader(test_dataset, batch_size=args.batch_size)
 
-    if args.loss.startswith("recon"):
-        loss = LOSS_REGISTRY[args.loss](alpha=args.alpha)
-    else:
-        loss = LOSS_REGISTRY[args.loss]()
-
-    trainer = AETrainer(
-        model=dp_model,
-        loss=loss,
-        optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
-        device=args.device,
-    )
     with mlflow.start_run(
         experiment_id=experiment.experiment_id,
         run_name=args.run_name + f"_fold{fold}_downstream",
@@ -389,14 +374,36 @@ if __name__ == "__main__":
             train_masks += cosas_data1.masks if args.use_task1 else list()
 
             # MODEL
-            model = MultiTaskAE(
-                architecture="Unet",
-                encoder_name="efficientnet-b7",
-                input_size=(args.input_size, args.input_size),
-            )
+            if args.model_name == "autoencoder":
+                model = MultiTaskAE(
+                    architecture="Unet",
+                    encoder_name="efficientnet-b7",
+                    input_size=(args.input_size, args.input_size),
+                )
+                encoder = EncoderClassifier(model.encoder)
+                encoder = encoder.to(args.device)
+                model = model.to(args.device)
 
-            model = model.to(args.device)
-            encoder = EncoderClassifier(model.encoder).to(args.device)
+                dp_model = torch.nn.DataParallel(model)
+                fine_tuning_trainer = AETrainer(
+                    model=dp_model,
+                    loss=LOSS_REGISTRY[args.loss](alpha=args.alpha),
+                    optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+                    device=args.device,
+                )
+            else:
+                model = Segformer()
+                encoder = SegformerClassifier(model.model.segformer)
+                encoder = encoder.to(args.device)
+                model = model.to(args.device)
+
+                dp_model = torch.nn.DataParallel(model)
+                fine_tuning_trainer = BinaryClassifierTrainer(
+                    model=dp_model,
+                    loss=LOSS_REGISTRY[args.loss](),
+                    optimizer=torch.optim.Adam(model.parameters(), lr=args.lr),
+                    device=args.device,
+                )
 
             train_pretrain(
                 args,
@@ -408,9 +415,10 @@ if __name__ == "__main__":
                 test_images,
                 test_masks,
             )
+
             test_metrics = fine_tuning(
                 args,
-                model,
+                fine_tuning_trainer,
                 train_images,
                 val_images,
                 train_masks,

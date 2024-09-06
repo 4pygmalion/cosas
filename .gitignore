@@ -167,3 +167,4 @@ task2/
 *.ipynb
 *.pth
 settings.json
+notebooks

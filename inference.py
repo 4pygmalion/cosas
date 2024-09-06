@@ -87,9 +87,9 @@ def main():
     model_path = os.path.join(CURRENT_DIR, "model.pth")
     model = torch.load(model_path).eval().to(device)
 
-    # normalizer = SPCNNormalizer()
-    # target_image = np.array(Image.open("target_image.png"))
-    # normalizer.fit(target_image)
+    normalizer = SPCNNormalizer()
+    target_image = np.array(Image.open("target_image.png"))
+    normalizer.fit(target_image)
     postprocess_pipe = PostProcessPipe(
         [
             discard_minor_prediction,
@@ -106,7 +106,8 @@ def main():
             except Exception as e:
                 print(e)
 
-            x: torch.Tensor = preprocess_image(raw_image, device)
+            norm_image = normalizer.transform(raw_image)
+            x: torch.Tensor = preprocess_image(norm_image, device)
             with torch.no_grad():
                 # logit = model(x)["mask"]
                 logit = rotational_tta_dict(x, model)["mask"]
