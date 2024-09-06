@@ -10,7 +10,12 @@ from PIL import Image
 from albumentations.pytorch.transforms import ToTensorV2
 
 from cosas.normalization import SPCNNormalizer
-from cosas.transforms import discard_minor_prediction
+from cosas.transforms import (
+    discard_minor_prediction,
+    PostProcessPipe,
+    mophologic_transformation,
+)
+from cosas.misc import rotational_tta_dict
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -34,7 +39,7 @@ def preprocess_image(image_array: np.ndarray, device: str):
 
     transform = A.Compose(
         [
-            A.Resize(512, 512),
+            A.Resize(640, 640),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
@@ -43,7 +48,7 @@ def preprocess_image(image_array: np.ndarray, device: str):
     return transform(image=image_array)["image"].to(device).unsqueeze(0)
 
 
-def postprocess_image(confidences: torch.Tensor, original_size):
+def postprocess_image(confidences: torch.Tensor, postprocess_pipe, original_size):
     """[summary] postprocessing model result to original image format"""
 
     if confidences.ndim != 4:
@@ -55,7 +60,7 @@ def postprocess_image(confidences: torch.Tensor, original_size):
 
     pred_mask = (upsampled_confidences >= 0.5).astype(np.uint8)
 
-    return discard_minor_prediction(pred_mask)
+    return postprocess_pipe(pred_mask)
 
 
 def write_image(path, result):
@@ -82,9 +87,16 @@ def main():
     model_path = os.path.join(CURRENT_DIR, "model.pth")
     model = torch.load(model_path).eval().to(device)
 
-    normalizer = SPCNNormalizer()
-    target_image = np.array(Image.open("target_image.png"))
-    normalizer.fit(target_image)
+    # normalizer = SPCNNormalizer()
+    # target_image = np.array(Image.open("target_image.png"))
+    # normalizer.fit(target_image)
+    postprocess_pipe = PostProcessPipe(
+        [
+            discard_minor_prediction,
+            mophologic_transformation,
+        ]
+    )
+
     for filename in os.listdir(input_dir):
         if filename.endswith(".mha"):
             output_path = os.path.join(output_dir, filename)
@@ -94,14 +106,18 @@ def main():
             except Exception as e:
                 print(e)
 
-            norm_image = normalizer.transform(raw_image)
-            x: torch.Tensor = preprocess_image(norm_image, device)
+            x: torch.Tensor = preprocess_image(raw_image, device)
             with torch.no_grad():
-                logit = model(x)
+                # logit = model(x)["mask"]
+                logit = rotational_tta_dict(x, model)["mask"]
                 confidence: torch.Tensor = torch.sigmoid(logit)
 
             original_size = raw_image.shape[:2]
-            result = postprocess_image(confidence, original_size=original_size)
+            result = postprocess_image(
+                confidence,
+                postprocess_pipe=postprocess_pipe,
+                original_size=original_size,
+            )
             write_image(output_path, result)
 
 
