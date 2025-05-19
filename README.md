@@ -32,12 +32,12 @@ For challenge details see the official [COSAS grand-challenge page](https://cosa
 
 ## Quick start
 Requires Docker ≥ 24 & make.
-# 1. Build an inference image around your trained checkpoint
+### 1. Build an inference image around your trained checkpoint
 ```bash
 make build MODEL_PATH=/path/to/model.pth
 ```
 
-# 2. Run a quick smoke-test on sample images
+### 2. Run a quick smoke-test on sample images
 ```bash
 make test_run
 ```
