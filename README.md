@@ -56,6 +56,7 @@ COSAS external (6 scanners)	0.792	0.792
 The submitted model ranked top-10 on the COSAS final leaderboard (Task 2).
 
 ## Cite
+```bibtex
 @article{Kim2025COSAS,
   author    = {Ho Heon Kim and Won Chan Jeong and Youngjin Park and Young Sin Ko},
   title     = {Understanding Stain Separation Improves Cross-Scanner Adenocarcinoma Segmentation with Joint Multi-Task Learning},
@@ -66,6 +67,6 @@ The submitted model ranked top-10 on the COSAS final leaderboard (Task 2).
   doi       = {10.3233/SHTI250272},
   publisher = {IOS Press}
 }
-
+```
 
 
