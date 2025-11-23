@@ -1,4 +1,5 @@
 import os
+import argparse
 
 import mlflow
 import segmentation_models_pytorch as smp
@@ -6,6 +7,7 @@ import torch
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
+from cosas.misc import SetSMPArgs
 from cosas.tracking import get_experiment
 from cosas.paths import DATA_DIR
 from cosas.data_model import COSASData
@@ -18,6 +20,7 @@ from cosas.transforms import (
     get_lab_distribution,
     AUG_REGISTRY,
 )
+from cosas.networks import MODEL_REGISTRY
 from cosas.losses import LOSS_REGISTRY
 from cosas.misc import set_seed, get_config
 from cosas.trainer import BinaryClassifierTrainer
@@ -44,8 +47,60 @@ def stain_normalization(train_images, val_images, test_images):
     return train_images, val_images, test_images
 
 
+def extended_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--run_name", type=str, default="baseline", help="Run name")
+    parser.add_argument("--task", type=int, help="Task number", default=2)
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--epochs", type=int, default=200, help="Number of epochs")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--device", type=str, default="cuda", help="Device to use")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        choices=list(DATASET_REGISTRY.keys()),
+        required=True,
+    )
+    parser.add_argument(
+        "--loss", type=str, choices=list(LOSS_REGISTRY.keys()), required=True
+    )
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument(
+        "--n_patience", type=int, default=10, help="Number of patience epochs"
+    )
+    parser.add_argument("--input_size", type=int, help="Image size", required=True)
+    parser.add_argument(
+        "--model_name", type=str, help="Model name", choices=list(MODEL_REGISTRY.keys())
+    )
+    parser.add_argument(
+        "--smp",
+        nargs="+",
+        action=SetSMPArgs,
+        help=(
+            "Set SMP encoder name and weights \n"
+            "For example:"
+            "--smp 'encoder_name:efficientnet-b4' 'encoder_weights:imagenet'"
+        ),
+    )
+    parser.add_argument("--use_sn", action="store_true", help="Use stain normalization")
+    parser.add_argument(
+        "--sa", choices=list(AUG_REGISTRY.keys()), help="Use stain augmentation"
+    )
+    parser.add_argument(
+        "-a",
+        "--aggregation",
+        type=str,
+        help="Aggregation",
+        choices=["majority_voting", "max_confidence", "meta"],
+    )
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    args = get_config()
+    args = extended_args()
     set_seed(42)
 
     cosas_data = COSASData(DATA_DIR, task=args.task)
@@ -156,13 +211,15 @@ if __name__ == "__main__":
                         args.device
                     )
                 else:
-                    model = MODEL_REGISTRY[args.model_name]().to(args.device)
+                    model = MODEL_REGISTRY[args.model_name](
+                        aggregation_method=args.aggregation
+                    ).to(args.device)
 
             # Get model params for ensemble learning (continual)
             # Model1 - MultiTaskAE - ae_efficietnet-b7_mix_fold4
             # Model2 - Segformer - segformer_iou_fold4
-            model1_uri = "/vast/AI_team/mlflow_artifact/13/f7fdd3b7ef354160ab8fd4882ec2be35/artifacts/model"
-            model2_uri = "/vast/AI_team/mlflow_artifact/13/c0f3923ab34842648faf50de6e4f832f/artifacts/model"
+            model1_uri = "/vast/AI_team/mlflow_artifact/13/8681c47d4dc4453da6c38361347170a2/artifacts/model"
+            model2_uri = "/vast/AI_team/mlflow_artifact/13/58962ca27d534d548e5b9d96d35f9273/artifacts/model"
 
             model1_state_dict = mlflow.pytorch.load_model(model1_uri).state_dict()
             model2_state_dict = mlflow.pytorch.load_model(model2_uri).state_dict()
